@@ -9,7 +9,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
     
-    <link rel="stylesheet" href="styles.css?v=1.3.1">
+    <link rel="stylesheet" href="styles.css?v=1.4.0">
 </head>
 <body>
 
@@ -19,8 +19,18 @@
         <div class="controls">
             <div class="mode-selector">
                 <h3>Modo de Importación</h3>
-                <label><input type="radio" name="uploadMode" value="file" checked> Archivos Excel (Procesamiento Automático o Selección Manual por rangos)</label>
-                <label><input type="radio" name="uploadMode" value="paste"> Pegar Texto Directamente (Copy-Paste)</label>
+                <label>
+                    <input type="radio" name="uploadMode" value="file" checked> 
+                    <span class="tooltip">Archivos Excel
+                        <span class="tooltiptext">Procesamiento Automático o Selección Manual por rangos</span>
+                    </span>
+                </label>
+                <label>
+                    <input type="radio" name="uploadMode" value="paste"> 
+                    <span class="tooltip">Pegar Texto Directamente
+                        <span class="tooltiptext">Copy-Paste</span>
+                    </span>
+                </label>
             </div>
 
             <input type="file" id="fileInput" accept=".xlsx, .xls, .csv" multiple>
@@ -35,9 +45,17 @@
             </div>
             
             <div class="settings-panel">
-                <h3>Configuración de Intervalos (k)</h3>
-                <label><input type="radio" name="kMethod" value="sturges" checked> Automático (Regla de Sturges)</label>
-                <label><input type="radio" name="kMethod" value="manual"> Definir Manualmente: <input type="number" id="kManualValue" min="1" step="1" placeholder="Ej: 6" disabled></label>
+                <h3>Configuración de Intervalos</h3>
+                <label>
+                    <input type="radio" name="kMethod" value="sturges" checked> 
+                    <span class="tooltip">Automático
+                        <span class="tooltiptext">Regla de Sturges: k ≈ 1 + 3.322 · log₁₀(n)</span>
+                    </span>
+                </label>
+                <label>
+                    <input type="radio" name="kMethod" value="manual"> 
+                    Definir Manualmente: <input type="number" id="kManualValue" min="1" step="1" placeholder="Ej: 6" disabled>
+                </label>
             </div>
 
             <div class="btn-group">
@@ -76,6 +94,6 @@
         </div>
     </div>
 
-    <script src="script.js?v=1.3.1"></script>
+    <script src="script.js?v=1.4.0"></script>
 </body>
 </html>

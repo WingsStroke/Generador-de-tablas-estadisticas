@@ -81,8 +81,8 @@ function handleFileUpload(e) {
 
         let li = document.createElement('li');
         li.innerHTML = `
-            <span>📄 ${file.name}</span>
-            <button class="preview-btn" onclick="openExcelModal('${fileId}')">🔍 Previsualizar / Seleccionar</button>
+            <span>${file.name}</span>
+            <button class="preview-btn" onclick="openExcelModal('${fileId}')">Previsualizar / Seleccionar</button>
         `;
         queueList.appendChild(li);
     }
@@ -99,7 +99,7 @@ async function processAllData() {
     activeMethod = document.querySelector('input[name="kMethod"]:checked').value;
     if (activeMethod === 'manual') {
         const manualK = parseInt(document.getElementById('kManualValue').value);
-        if (isNaN(manualK) || manualK < 1) return alert("Ingresa un número de intervalos (k) válido.");
+        if (isNaN(manualK) || manualK < 1) return alert("Ingresa un número de intervalos válido.");
     }
 
     const uploadMode = document.querySelector('input[name="uploadMode"]:checked').value;
@@ -188,10 +188,9 @@ function openExcelModal(fileId) {
         
         renderPreviewTable();
         
-        // Restaurar estado visual de los rangos guardados previamente
         const savedRangesCount = fileObj.customRanges.length;
         if(savedRangesCount > 0) {
-            alert(`Este archivo ya tiene ${savedRangesCount} rango(s) guardado(s). Las celdas negras están bloqueadas.`);
+            alert(`Este archivo ya tiene ${savedRangesCount} rango(s) guardado(s). Las celdas oscuras están bloqueadas.`);
         }
         
         document.getElementById('previewModal').classList.remove('hidden');
@@ -218,8 +217,6 @@ function renderPreviewTable() {
 
     table.addEventListener('mousedown', (e) => {
         if(e.target.tagName !== 'TD') return;
-        
-        // FIX BUG 2: Evitar seleccionar celdas ya guardadas
         if(e.target.classList.contains('cell-saved')) return; 
 
         isDragging = true;
@@ -242,7 +239,7 @@ function renderPreviewTable() {
 
     table.addEventListener('mouseover', (e) => {
         if(!isDragging || !startCell || e.target.tagName !== 'TD') return;
-        if(e.target.classList.contains('cell-saved')) return; // FIX BUG 2
+        if(e.target.classList.contains('cell-saved')) return; 
         
         const r = parseInt(e.target.dataset.r);
         const c = parseInt(e.target.dataset.c);
@@ -288,13 +285,11 @@ function selectRange(start, end, clearFirst) {
     for(let r = minR; r <= maxR; r++) {
         for(let c = minC; c <= maxC; c++) {
             const td = document.querySelector(`td[data-r="${r}"][data-c="${c}"]`);
-            // Solo seleccionar si no está guardada ya
             if(td && !td.classList.contains('cell-saved')) td.classList.add('cell-selected');
         }
     }
 }
 
-// BOTONES DE MODAL
 function clearSelection() {
     document.querySelectorAll('.cell-selected').forEach(td => td.classList.remove('cell-selected'));
 }
@@ -303,8 +298,8 @@ document.getElementById('clearSelectionBtn').addEventListener('click', clearSele
 document.getElementById('resetRangesBtn').addEventListener('click', () => {
     if(!confirm("¿Estás seguro de que deseas borrar todos los rangos guardados para este archivo?")) return;
     const fileObj = uploadedFilesMap.get(currentPreviewFileId);
-    fileObj.customRanges = []; // Resetear memoria lógica
-    document.querySelectorAll('.cell-saved').forEach(td => td.classList.remove('cell-saved')); // Resetear UI
+    fileObj.customRanges = []; 
+    document.querySelectorAll('.cell-saved').forEach(td => td.classList.remove('cell-saved')); 
     updateRangeCount();
 });
 
