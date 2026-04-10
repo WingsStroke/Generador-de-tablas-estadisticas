@@ -1,9 +1,11 @@
 // ==========================================
-// VARIABLES GLOBALES Y UTILIDADES
+// VARIABLES GLOBALES
 // ==========================================
 let activeMethod = 'sturges'; 
-let globalDatasets = []; // Arreglo que guardará hasta 10 datasets
+let globalDatasets = []; 
+let uploadedFilesMap = new Map(); // Guarda la info de los archivos y sus rangos
 const MAX_DATASETS = 10;
+let currentSlide = 0;
 
 // Utilidades Numéricas
 const cleanNum = (num, decimals = 4) => {
@@ -29,7 +31,7 @@ function createStatRow(label, value, formula) {
 }
 
 // ==========================================
-// CONTROLADORES DE UI (MODOS E INPUTS)
+// CONTROLADORES DE UI (INPUTS Y COLA)
 // ==========================================
 document.querySelectorAll('input[name="kMethod"]').forEach(r => {
     r.addEventListener('change', (e) => {
@@ -39,63 +41,73 @@ document.querySelectorAll('input[name="kMethod"]').forEach(r => {
     });
 });
 
-document.querySelectorAll('input[name="uploadMode"]').forEach(r => {
-    r.addEventListener('change', (e) => {
-        const fileInput = document.getElementById('fileInput');
-        // Si es manual, restringir a 1 archivo
-        if(e.target.value === 'manual') {
-            fileInput.removeAttribute('multiple');
-        } else {
-            fileInput.setAttribute('multiple', 'multiple');
-        }
-    });
-});
+document.getElementById('fileInput').addEventListener('change', handleFileUpload);
 
-document.getElementById('processBtn').addEventListener('click', handleProcessClick);
+function handleFileUpload(e) {
+    const files = e.target.files;
+    if (files.length > MAX_DATASETS) {
+        alert(`Has subido ${files.length} archivos. Solo se procesarán los primeros ${MAX_DATASETS}.`);
+    }
+
+    uploadedFilesMap.clear();
+    const queueList = document.getElementById('fileList');
+    queueList.innerHTML = '';
+    
+    let limit = Math.min(files.length, MAX_DATASETS);
+    for (let i = 0; i < limit; i++) {
+        let file = files[i];
+        let fileId = `file_${i}`;
+        uploadedFilesMap.set(fileId, { file: file, customRanges: [] });
+
+        let li = document.createElement('li');
+        li.innerHTML = `
+            <span>📄 ${file.name}</span>
+            <button class="preview-btn" onclick="openExcelModal('${fileId}')">🔍 Previsualizar / Seleccionar</button>
+        `;
+        queueList.appendChild(li);
+    }
+    document.getElementById('fileQueue').classList.remove('hidden');
+}
+
+document.getElementById('processBtn').addEventListener('click', processAllData);
 document.getElementById('exportBtn').addEventListener('click', exportAllToExcel);
 
 // ==========================================
-// LÓGICA PRINCIPAL DE PROCESAMIENTO
+// PROCESAMIENTO PRINCIPAL
 // ==========================================
-async function handleProcessClick() {
-    const fileInput = document.getElementById('fileInput');
-    const uploadMode = document.querySelector('input[name="uploadMode"]:checked').value;
-    activeMethod = document.querySelector('input[name="kMethod"]:checked').value;
-
-    if (!fileInput.files.length) return alert("Sube al menos un archivo Excel.");
-    if (fileInput.files.length > MAX_DATASETS) return alert(`Límite excedido. Máximo ${MAX_DATASETS} archivos.`);
+async function processAllData() {
+    if (uploadedFilesMap.size === 0) return alert("Sube al menos un archivo Excel.");
     
+    activeMethod = document.querySelector('input[name="kMethod"]:checked').value;
     if (activeMethod === 'manual') {
         const manualK = parseInt(document.getElementById('kManualValue').value);
         if (isNaN(manualK) || manualK < 1) return alert("Ingresa un número de intervalos (k) válido.");
     }
 
-    globalDatasets = []; // Reiniciar lotes
-    document.getElementById('resultsArea').innerHTML = '';
-
-    if (uploadMode === 'auto') {
-        // MODO AUTO: Leer todos los archivos subidos
-        for (let i = 0; i < fileInput.files.length; i++) {
-            const raw = await extractNumbersFromFile(fileInput.files[i]);
-            
-            // Detección Inteligente
-            if (raw.length < 5 && fileInput.files.length === 1) {
-                const conf = confirm("No se detectó una columna limpia de números. ¿Deseas abrir el archivo y seleccionar los datos visualmente?");
-                if(conf) {
-                    document.querySelector('input[value="manual"][name="uploadMode"]').checked = true;
-                    return openExcelModal(fileInput.files[0]);
-                }
-            }
-            
+    globalDatasets = [];
+    document.getElementById('resultsArea').classList.add('hidden');
+    
+    for (let [fileId, fileData] of uploadedFilesMap) {
+        if (fileData.customRanges.length > 0) {
+            // Usar los rangos manuales guardados previamente
+            fileData.customRanges.forEach((rangeNums, idx) => {
+                globalDatasets.push(calculateStatsForDataset(rangeNums, `${fileData.file.name} (Rango ${idx+1})`));
+            });
+        } else {
+            // Extracción automática si no hubo selección manual
+            const raw = await extractNumbersFromFile(fileData.file);
             if (raw.length > 0) {
-                globalDatasets.push(calculateStatsForDataset(raw, `Archivo ${i+1}: ${fileInput.files[i].name}`));
+                globalDatasets.push(calculateStatsForDataset(raw, fileData.file.name));
             }
         }
-        renderAllDatasets();
-    } else {
-        // MODO MANUAL: Abrir modal con el primer archivo
-        openExcelModal(fileInput.files[0]);
     }
+
+    if(globalDatasets.length > MAX_DATASETS) {
+        globalDatasets = globalDatasets.slice(0, MAX_DATASETS);
+        alert(`Se han detectado demasiados conjuntos de datos. Se limitará a ${MAX_DATASETS} análisis.`);
+    }
+
+    renderCarousel();
 }
 
 function extractNumbersFromFile(file) {
@@ -120,16 +132,19 @@ function extractNumbersFromFile(file) {
 }
 
 // ==========================================
-// LÓGICA DEL MODAL VISUAL (SELECCIÓN DE RANGOS)
+// MODAL VISUAL INTERACTIVO (SHIFT + CTRL + AUTO-SCROLL)
 // ==========================================
 let preview2DArray = [];
 let isDragging = false;
 let startCell = null;
-let endCell = null;
-let savedRangesData = [];
+let lastClickedCell = null;
+let autoScrollInterval = null;
+let currentPreviewFileId = null;
 
-function openExcelModal(file) {
-    savedRangesData = [];
+function openExcelModal(fileId) {
+    currentPreviewFileId = fileId;
+    const fileObj = uploadedFilesMap.get(fileId);
+    document.getElementById('modalTitle').innerText = `Previsualización: ${fileObj.file.name}`;
     updateRangeCount();
     
     const reader = new FileReader();
@@ -141,7 +156,7 @@ function openExcelModal(file) {
         renderPreviewTable();
         document.getElementById('previewModal').classList.remove('hidden');
     };
-    reader.readAsArrayBuffer(file);
+    reader.readAsArrayBuffer(fileObj.file);
 }
 
 document.getElementById('closeModalBtn').onclick = () => document.getElementById('previewModal').classList.add('hidden');
@@ -149,7 +164,6 @@ document.getElementById('closeModalBtn').onclick = () => document.getElementById
 function renderPreviewTable() {
     const container = document.getElementById('tableContainer');
     let html = '<table id="interactiveTable">';
-    
     preview2DArray.forEach((row, rIdx) => {
         html += '<tr>';
         row.forEach((cell, cIdx) => {
@@ -161,47 +175,93 @@ function renderPreviewTable() {
     container.innerHTML = html;
 
     const table = document.getElementById('interactiveTable');
+
+    // LOGICA DE SELECCION (CTRL y SHIFT)
     table.addEventListener('mousedown', (e) => {
-        if(e.target.tagName === 'TD') {
-            isDragging = true;
-            startCell = { r: parseInt(e.target.dataset.r), c: parseInt(e.target.dataset.c) };
-            endCell = startCell;
-            highlightSelection();
+        if(e.target.tagName !== 'TD') return;
+        isDragging = true;
+        const r = parseInt(e.target.dataset.r);
+        const c = parseInt(e.target.dataset.c);
+
+        if (e.ctrlKey || e.metaKey) {
+            // CTRL: Alternar selección individual
+            e.target.classList.toggle('cell-selected');
+            lastClickedCell = {r, c};
+            startCell = null; 
+        } else if (e.shiftKey && lastClickedCell) {
+            // SHIFT: Seleccionar rango desde el último clic
+            selectRange(lastClickedCell, {r, c}, true);
+        } else {
+            // CLIC NORMAL: Limpiar y empezar nuevo arrastre
+            clearSelection();
+            e.target.classList.add('cell-selected');
+            startCell = {r, c};
+            lastClickedCell = {r, c};
         }
     });
+
     table.addEventListener('mouseover', (e) => {
-        if(isDragging && e.target.tagName === 'TD') {
-            endCell = { r: parseInt(e.target.dataset.r), c: parseInt(e.target.dataset.c) };
-            highlightSelection();
+        if(!isDragging || !startCell || e.target.tagName !== 'TD') return;
+        const r = parseInt(e.target.dataset.r);
+        const c = parseInt(e.target.dataset.c);
+        selectRange(startCell, {r, c}, true);
+    });
+
+    // LOGICA DE AUTO-SCROLL
+    container.addEventListener('mousemove', (e) => {
+        if(!isDragging) return;
+        const rect = container.getBoundingClientRect();
+        const buffer = 40; // Pixeles desde el borde para activar
+        let dx = 0, dy = 0;
+
+        if (e.clientX < rect.left + buffer) dx = -15;
+        else if (e.clientX > rect.right - buffer) dx = 15;
+        
+        if (e.clientY < rect.top + buffer) dy = -15;
+        else if (e.clientY > rect.bottom - buffer) dy = 15;
+
+        if (dx !== 0 || dy !== 0) {
+            if (!autoScrollInterval) {
+                autoScrollInterval = setInterval(() => {
+                    container.scrollLeft += dx;
+                    container.scrollTop += dy;
+                }, 30);
+            }
+        } else {
+            clearInterval(autoScrollInterval);
+            autoScrollInterval = null;
         }
     });
-    window.addEventListener('mouseup', () => { isDragging = false; });
+
+    window.addEventListener('mouseup', () => { 
+        isDragging = false; 
+        clearInterval(autoScrollInterval);
+        autoScrollInterval = null;
+    });
 }
 
-function highlightSelection() {
-    const tds = document.querySelectorAll('#interactiveTable td');
-    tds.forEach(td => td.classList.remove('cell-selected'));
-    
-    if(!startCell || !endCell) return;
-    
-    const minR = Math.min(startCell.r, endCell.r);
-    const maxR = Math.max(startCell.r, endCell.r);
-    const minC = Math.min(startCell.c, endCell.c);
-    const maxC = Math.max(startCell.c, endCell.c);
-
+function selectRange(start, end, clearFirst) {
+    if(clearFirst) clearSelection();
+    const minR = Math.min(start.r, end.r), maxR = Math.max(start.r, end.r);
+    const minC = Math.min(start.c, end.c), maxC = Math.max(start.c, end.c);
     for(let r = minR; r <= maxR; r++) {
         for(let c = minC; c <= maxC; c++) {
-            const cell = document.querySelector(`td[data-r="${r}"][data-c="${c}"]`);
-            if(cell && !cell.classList.contains('cell-saved')) cell.classList.add('cell-selected');
+            const td = document.querySelector(`td[data-r="${r}"][data-c="${c}"]`);
+            if(td && !td.classList.contains('cell-saved')) td.classList.add('cell-selected');
         }
     }
 }
 
+function clearSelection() {
+    document.querySelectorAll('.cell-selected').forEach(td => td.classList.remove('cell-selected'));
+}
+
 document.getElementById('saveRangeBtn').addEventListener('click', () => {
-    if(savedRangesData.length >= MAX_DATASETS) return alert(`Máximo ${MAX_DATASETS} rangos permitidos.`);
+    const fileObj = uploadedFilesMap.get(currentPreviewFileId);
+    if(fileObj.customRanges.length >= MAX_DATASETS) return alert("Máximo de rangos alcanzado para este archivo.");
     
     const selected = document.querySelectorAll('.cell-selected');
-    if(selected.length === 0) return alert("Selecciona un rango arrastrando el ratón primero.");
+    if(selected.length === 0) return alert("Selecciona datos primero.");
 
     let nums = [];
     selected.forEach(td => {
@@ -212,26 +272,21 @@ document.getElementById('saveRangeBtn').addEventListener('click', () => {
     });
 
     if(nums.length === 0) return alert("No hay números válidos en tu selección.");
-
-    savedRangesData.push(nums);
+    fileObj.customRanges.push(nums);
     updateRangeCount();
 });
 
 function updateRangeCount() {
-    document.getElementById('rangeCount').innerText = `Rangos guardados: ${savedRangesData.length}/${MAX_DATASETS}`;
+    const fileObj = uploadedFilesMap.get(currentPreviewFileId);
+    document.getElementById('rangeCount').innerText = `Rangos guardados: ${fileObj.customRanges.length}`;
 }
 
 document.getElementById('finishRangesBtn').addEventListener('click', () => {
-    if(savedRangesData.length === 0) return alert("No has guardado ningún rango.");
-    
-    globalDatasets = savedRangesData.map((raw, index) => calculateStatsForDataset(raw, `Conjunto Seleccionado ${index + 1}`));
     document.getElementById('previewModal').classList.add('hidden');
-    renderAllDatasets();
 });
 
-
 // ==========================================
-// MOTOR ESTADÍSTICO POR LOTE
+// MOTOR ESTADÍSTICO
 // ==========================================
 function calculateStatsForDataset(raw, datasetName) {
     let data = [...raw].sort((a, b) => a - b);
@@ -261,7 +316,6 @@ function calculateStatsForDataset(raw, datasetName) {
         currentMin = currentMax;
     }
 
-    // Estadísticas
     const sum = data.reduce((a, b) => a + b, 0);
     const mean = sum / n;
     const geoMean = Math.exp(data.reduce((s, x) => s + Math.log(x), 0) / n);
@@ -283,11 +337,12 @@ function calculateStatsForDataset(raw, datasetName) {
 }
 
 // ==========================================
-// RENDERIZADO HTML MULTIPLE
+// CARRUSEL DE RENDERIZADO
 // ==========================================
-function renderAllDatasets() {
-    const resultsArea = document.getElementById('resultsArea');
-    resultsArea.innerHTML = '<h2>Resultados del Análisis</h2>';
+function renderCarousel() {
+    const carousel = document.getElementById('resultsCarousel');
+    carousel.innerHTML = '';
+    currentSlide = 0;
     
     let kFormula = activeMethod === 'sturges' ? 'k ≈ 1 + 3.322 · log₁₀(n)' : 'Manual';
     let methodLabel = activeMethod === 'sturges' ? ' (Sturges)' : ' (Manual)';
@@ -297,7 +352,7 @@ function renderAllDatasets() {
         block.className = 'dataset-block';
         
         let freqHtml = `
-            <h3>${ds.name} - Tabla de Frecuencias</h3>
+            <h3>Análisis ${index + 1}: ${ds.name}</h3>
             <table>
                 <thead>
                     <tr><th>Límite Inf. (Li)</th><th>Límite Sup. (Ls)</th><th>Marca de Clase (Xi)</th><th>Frec. Abs. (fi)</th><th>Frec. Acum. (Fi)</th><th>Frec. Rel. (hi)</th><th>Frec. Rel. Acum. (Hi)</th></tr>
@@ -324,38 +379,58 @@ function renderAllDatasets() {
                     ${createStatRow('Media Arit.:', cleanNum(ds.stats.mean), 'x̄ = (Σxᵢ) / n')}
                     ${createStatRow('Media Geom.:', cleanNum(ds.stats.geoMean), 'MG = ⁿ√(x₁···xₙ)')}
                     ${createStatRow('Media Arm.:', cleanNum(ds.stats.harMean), 'MH = n / Σ(1/xᵢ)')}
-                    ${createStatRow('Mediana:', cleanNum(ds.stats.median), 'Me')}
-                    ${createStatRow('Moda:', ds.stats.mode.map(m=>cleanNum(m)).join(','), 'Mo')}
+                    ${createStatRow('Mediana:', cleanNum(ds.stats.median), 'Me = Lᵢ + A·[(n/2 - Fᵢ₋₁)/fᵢ]')}
+                    ${createStatRow('Moda:', ds.stats.mode.map(m=>cleanNum(m)).join(','), 'Mo = Lᵢ + A·[(fᵢ - fᵢ₋₁)/(2fᵢ - fᵢ₋₁ - fᵢ₊₁)]')}
                 </div>
                 <div class="stat-card">
                     <h3>Dispersión y Forma</h3>
                     ${createStatRow('Rango:', cleanNum(ds.range), 'R = x_max - x_min')}
-                    ${createStatRow('Varianza:', cleanNum(ds.stats.variance), 's²')}
+                    ${createStatRow('Varianza:', cleanNum(ds.stats.variance), 's² = Σ(xᵢ - x̄)² / (n - 1)')}
                     ${createStatRow('Desv. Est.:', cleanNum(ds.stats.stdDev), 's = √s²')}
                     ${createStatRow('C. Variación:', cleanNum(ds.stats.cv, 2) + '%', 'CV = (s/x̄)·100%')}
-                    ${createStatRow('Asimetría:', cleanNum(ds.stats.skewness), 'As')}
+                    ${createStatRow('Asimetría:', cleanNum(ds.stats.skewness), 'As = [n/((n-1)(n-2))] · Σ[(xᵢ-x̄)/s]³')}
                 </div>
                 <div class="stat-card">
                     <h3>Posición (Percentiles)</h3>
-                    ${createStatRow('P10 (10%):', cleanNum(ds.stats.p10), 'P₁₀')}
+                    ${createStatRow('P10 (10%):', cleanNum(ds.stats.p10), 'P₁₀ = Lᵢ + A·[(10n/100 - Fᵢ₋₁)/fᵢ]')}
                     ${createStatRow('Q1 (25%):', cleanNum(ds.stats.q1), 'Q₁')}
-                    ${createStatRow('Q2 (50%):', cleanNum(ds.stats.q2), 'Q₂')}
+                    ${createStatRow('Q2 (50%):', cleanNum(ds.stats.q2), 'Q₂ = Mediana')}
                     ${createStatRow('Q3 (75%):', cleanNum(ds.stats.q3), 'Q₃')}
-                    ${createStatRow('P90 (90%):', cleanNum(ds.stats.p90), 'P₉₀')}
+                    ${createStatRow('P90 (90%):', cleanNum(ds.stats.p90), 'P₉₀ = Lᵢ + A·[(90n/100 - Fᵢ₋₁)/fᵢ]')}
                 </div>
             </div>
         `;
 
         block.innerHTML = freqHtml + statsHtml;
-        resultsArea.appendChild(block);
+        carousel.appendChild(block);
     });
 
-    resultsArea.classList.remove('hidden');
+    document.getElementById('resultsArea').classList.remove('hidden');
     document.getElementById('exportBtn').classList.remove('hidden');
+    updateCarouselUI();
+}
+
+document.getElementById('prevBtn').addEventListener('click', () => {
+    if (currentSlide > 0) { currentSlide--; updateCarouselUI(); }
+});
+
+document.getElementById('nextBtn').addEventListener('click', () => {
+    if (currentSlide < globalDatasets.length - 1) { currentSlide++; updateCarouselUI(); }
+});
+
+function updateCarouselUI() {
+    const carousel = document.getElementById('resultsCarousel');
+    const width = carousel.clientWidth;
+    // Scroll Horizontal dinámico
+    carousel.scrollTo({ left: width * currentSlide, behavior: 'smooth' });
+    
+    document.getElementById('carouselIndicator').innerText = `Tabla ${currentSlide + 1} de ${globalDatasets.length}`;
+    document.getElementById('prevBtn').disabled = currentSlide === 0;
+    document.getElementById('nextBtn').disabled = currentSlide === globalDatasets.length - 1;
 }
 
 // ==========================================
-// EXPORTACIÓN MÚLTIPLE A EXCELJS
+// EXPORTACIÓN A EXCELJS
 // ==========================================
 async function exportAllToExcel() {
     const wb = new ExcelJS.Workbook();
@@ -369,9 +444,8 @@ async function exportAllToExcel() {
     };
 
     globalDatasets.forEach((ds, idx) => {
-        let shortName = ds.name.substring(0, 20).replace(/[:*?/"<>|]/g, ''); // Limpiar para tab de excel
+        let shortName = ds.name.substring(0, 20).replace(/[:*?/"<>|]/g, ''); 
         
-        // Hoja de Datos
         const wsDatos = wb.addWorksheet(`D_${idx+1}_${shortName}`);
         wsDatos.getCell('A1').value = "DATOS ORDENADOS";
         wsDatos.getCell('A1').font = headerStyle.font; wsDatos.getCell('A1').fill = headerStyle.fill;
@@ -380,7 +454,6 @@ async function exportAllToExcel() {
         
         const dataRange = `'D_${idx+1}_${shortName}'!A2:A${ds.n + 1}`;
 
-        // Hoja de Análisis
         const ws = wb.addWorksheet(`A_${idx+1}_${shortName}`);
         const headers = ['LÍMITE INF. (LI)', 'LÍMITE SUP. (LS)', 'MARCA DE CLASE (XI)', 'FREC. ABS (FI)', 'FREC. ACUM (FI)', 'FREC. REL (HI)', 'FREC. REL ACUM (HI)'];
         ws.addRow(headers);
