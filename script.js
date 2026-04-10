@@ -78,7 +78,6 @@ function handleFileUpload(e) {
         let file = files[i];
         let fileId = `file_${i}`;
         uploadedFilesMap.set(fileId, { file: file, customRanges: [] });
-
         let li = document.createElement('li');
         li.innerHTML = `<span>${file.name}</span><button class="preview-btn" onclick="openExcelModal('${fileId}')">Previsualizar / Seleccionar</button>`;
         queueList.appendChild(li);
@@ -102,6 +101,7 @@ async function processAllData() {
     const uploadMode = document.querySelector('input[name="uploadMode"]:checked').value;
     globalDatasets = [];
     document.getElementById('resultsArea').classList.add('hidden');
+    document.getElementById('floatingProcedureBtn').classList.add('hidden'); // Ocultar botón al recalcular
 
     if (uploadMode === 'paste') {
         const text = document.getElementById('pasteInput').value;
@@ -109,7 +109,7 @@ async function processAllData() {
         
         const rawStrings = text.split(/[;,\/\s\n]+/);
         const rawNums = rawStrings.map(s => parseFloat(s)).filter(n => !isNaN(n));
-        if (rawNums.length === 0) return alert("No se encontraron números válidos. Asegúrate de usar punto (.) para los decimales.");
+        if (rawNums.length === 0) return alert("No se encontraron números válidos.");
         
         globalDatasets.push(calculateStatsForDataset(rawNums, "Datos Pegados"));
         renderCarousel();
@@ -309,25 +309,28 @@ function calculateStatsForDataset(raw, datasetName) {
     data.forEach(num => { freqMap[num] = (freqMap[num] || 0) + 1; if (freqMap[num] > maxFreq) maxFreq = freqMap[num]; });
     for (const key in freqMap) if (freqMap[key] === maxFreq) mode.push(Number(key));
 
-    const variance = data.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / (n - 1);
+    const varianceSum = data.reduce((a, b) => a + Math.pow(b - mean, 2), 0); // Guardado para procedimiento
+    const variance = varianceSum / (n - 1);
     const stdDev = Math.sqrt(variance);
     const cv = (stdDev / mean) * 100;
 
     let skewness = 0;
     if (n > 2 && stdDev > 0) skewness = (n / ((n - 1) * (n - 2))) * data.reduce((acc, val) => acc + Math.pow((val - mean) / stdDev, 3), 0);
 
-    return { name: datasetName, data, n, minVal, maxVal, range, numClasses, amplitude, classesData, stats: { mean, geoMean, harMean, median, mode, variance, stdDev, cv, skewness, p10: getPercentile(data,10), q1: getPercentile(data,25), q2: getPercentile(data,50), q3: getPercentile(data,75), p90: getPercentile(data,90) }};
+    return { 
+        name: datasetName, data, n, minVal, maxVal, range, numClasses, amplitude, classesData, 
+        stats: { sum, mean, geoMean, harMean, median, mode, varianceSum, variance, stdDev, cv, skewness, p10: getPercentile(data,10), q1: getPercentile(data,25), q2: getPercentile(data,50), q3: getPercentile(data,75), p90: getPercentile(data,90) }
+    };
 }
 
 // ==========================================
 // SISTEMA DE GRÁFICOS INTERACTIVOS (CHART.JS)
 // ==========================================
-let activeModalChart = null; // Variable para gestionar el gráfico ampliado en el modal
+let activeModalChart = null; 
 
-// Configuración general para gráficas pequeñas
 const miniChartOptions = {
     responsive: true,
-    maintainAspectRatio: false, // Permite que se adapte al CSS
+    maintainAspectRatio: false, 
     plugins: { legend: { display: false } },
     scales: { x: { display: true }, y: { display: true } }
 };
@@ -365,76 +368,127 @@ function getChartConfig(ds, type) {
 }
 
 function renderChartsForDataset(ds, index) {
-    // 1. Histograma
-    new Chart(document.getElementById(`chartHist-${index}`).getContext('2d'), {
-        ...getChartConfig(ds, 'hist'),
-        options: { ...miniChartOptions, scales: { y: { beginAtZero: true } } }
-    });
-
-    // 2. Ojiva
-    new Chart(document.getElementById(`chartOjiva-${index}`).getContext('2d'), {
-        ...getChartConfig(ds, 'ojiva'),
-        options: { ...miniChartOptions, scales: { y: { beginAtZero: true, max: 100 } } }
-    });
-
-    // 3. Diagrama de Caja
+    new Chart(document.getElementById(`chartHist-${index}`).getContext('2d'), { ...getChartConfig(ds, 'hist'), options: { ...miniChartOptions, scales: { y: { beginAtZero: true } } } });
+    new Chart(document.getElementById(`chartOjiva-${index}`).getContext('2d'), { ...getChartConfig(ds, 'ojiva'), options: { ...miniChartOptions, scales: { y: { beginAtZero: true, max: 100 } } } });
     try {
-        new Chart(document.getElementById(`chartBox-${index}`).getContext('2d'), {
-            ...getChartConfig(ds, 'box'),
-            options: { ...miniChartOptions, indexAxis: 'y' }
-        });
+        new Chart(document.getElementById(`chartBox-${index}`).getContext('2d'), { ...getChartConfig(ds, 'box'), options: { ...miniChartOptions, indexAxis: 'y' } });
     } catch (e) {
         document.getElementById(`chartBox-${index}`).parentElement.innerHTML = `<p style="color:#a00000; text-align:center; padding:20px;">Error al cargar BoxPlot.</p>`;
     }
 }
 
-// NUEVO: Función para abrir el modal con el gráfico ampliado
 window.openChartModal = function(dsIndex, chartType) {
     const ds = globalDatasets[dsIndex];
     const modal = document.getElementById('chartModal');
     const titleEl = document.getElementById('chartModalTitle');
     const ctx = document.getElementById('modalCanvas').getContext('2d');
     
-    // Destruir gráfico previo si existe para que no se superpongan
     if (activeModalChart) activeModalChart.destroy();
-    
     modal.classList.remove('hidden');
 
-    let titleText = "";
-    let options = { responsive: true, maintainAspectRatio: false };
-
-    if (chartType === 'hist') {
-        titleText = "Histograma y Polígono de Frecuencias";
-        options.scales = { y: { beginAtZero: true } };
-    } else if (chartType === 'ojiva') {
-        titleText = "Ojiva de Frecuencias (Menor que)";
-        options.scales = { y: { beginAtZero: true, max: 100 } };
-    } else if (chartType === 'box') {
-        titleText = "Diagrama de Caja y Bigotes";
-        options.indexAxis = 'y';
-        options.plugins = { legend: { display: false } };
-    }
+    let titleText = ""; let options = { responsive: true, maintainAspectRatio: false };
+    if (chartType === 'hist') { titleText = "Histograma y Polígono de Frecuencias"; options.scales = { y: { beginAtZero: true } }; } 
+    else if (chartType === 'ojiva') { titleText = "Ojiva de Frecuencias (Menor que)"; options.scales = { y: { beginAtZero: true, max: 100 } }; } 
+    else if (chartType === 'box') { titleText = "Diagrama de Caja y Bigotes"; options.indexAxis = 'y'; options.plugins = { legend: { display: false } }; }
 
     titleEl.innerText = `${titleText} - ${ds.name}`;
-
-    activeModalChart = new Chart(ctx, {
-        ...getChartConfig(ds, chartType),
-        options: options
-    });
+    activeModalChart = new Chart(ctx, { ...getChartConfig(ds, chartType), options: options });
 };
 
-document.getElementById('closeChartModalBtn').addEventListener('click', () => {
-    document.getElementById('chartModal').classList.add('hidden');
-});
-
-window.toggleAccordion = function(header) {
-    const item = header.parentElement;
-    item.classList.toggle('active');
-};
-
+document.getElementById('closeChartModalBtn').addEventListener('click', () => document.getElementById('chartModal').classList.add('hidden'));
+window.toggleAccordion = function(header) { header.parentElement.classList.toggle('active'); };
 
 // ==========================================
-// CARRUSEL DE RENDERIZADO
+// NUEVO: PROCEDIMIENTO PASO A PASO (v1.8.0)
+// ==========================================
+document.getElementById('floatingProcedureBtn').addEventListener('click', () => {
+    const ds = globalDatasets[currentSlide]; // Usar siempre el dataset visible en pantalla
+    const content = document.getElementById('procedureContent');
+    const title = document.getElementById('procedureModalTitle');
+    
+    title.innerText = `Procedimiento: ${ds.name}`;
+    
+    let isSturges = activeMethod === 'sturges';
+    
+    let html = `
+        <div class="procedure-step">
+            <h3>1. Creación de la Tabla (Parámetros Base)</h3>
+            <p>Para agrupar los datos, primero necesitamos calcular tres valores fundamentales:</p>
+            
+            <div class="math-formula">
+                1. Rango (R) = Valor Máximo - Valor Mínimo<br>
+                R = ${cleanNum(ds.maxVal)} - ${cleanNum(ds.minVal)}<br>
+                <span class="math-highlight">R = ${cleanNum(ds.range)}</span>
+            </div>
+
+            <div class="math-formula">
+                2. Número de Intervalos (k) ${isSturges ? 'usando la Regla de Sturges' : 'definido manualmente'}<br>
+                ${isSturges ? `k ≈ 1 + 3.322 * log₁₀(n)<br>k ≈ 1 + 3.322 * log₁₀(${ds.n})<br>` : ''}
+                <span class="math-highlight">k = ${ds.numClasses}</span>
+            </div>
+
+            <div class="math-formula">
+                3. Amplitud (A) = Rango / k<br>
+                A = ${cleanNum(ds.range)} / ${ds.numClasses}<br>
+                <span class="math-highlight">A = ${cleanNum(ds.amplitude)}</span>
+            </div>
+            <p><i>Con la Amplitud sabemos de qué tamaño será el "salto" de cada intervalo en la tabla.</i></p>
+        </div>
+
+        <div class="procedure-step">
+            <h3>2. Medidas de Tendencia Central (Datos exactos)</h3>
+            <p>Se calculan analizando los ${ds.n} datos crudos para mayor precisión estadística:</p>
+            
+            <div class="math-formula">
+                <b>Media Aritmética (x̄)</b> = Sumatoria de todos los datos / n<br>
+                x̄ = (x₁ + x₂ + ... + xₙ) / n<br>
+                x̄ = ${cleanNum(ds.stats.sum)} / ${ds.n}<br>
+                <span class="math-highlight">x̄ = ${cleanNum(ds.stats.mean)}</span>
+            </div>
+
+            <div class="math-formula">
+                <b>Mediana (Me)</b> = El valor que se encuentra exactamente en la mitad de los datos ordenados.<br>
+                Como n=${ds.n} (${ds.n % 2 === 0 ? 'Par' : 'Impar'}), la posición central es ${ds.n % 2 === 0 ? `el promedio de la posición ${(ds.n/2)} y ${(ds.n/2)+1}` : `la posición ${Math.ceil(ds.n/2)}`}.<br>
+                <span class="math-highlight">Me = ${cleanNum(ds.stats.median)}</span>
+            </div>
+        </div>
+
+        <div class="procedure-step">
+            <h3>3. Medidas de Dispersión (Datos exactos muestrales)</h3>
+            <p>Estas medidas indican qué tan alejados están los datos respecto a la Media (x̄ = ${cleanNum(ds.stats.mean)}).</p>
+            
+            <div class="math-formula">
+                <b>Varianza Muestral (s²)</b> = Sumatoria de las diferencias al cuadrado / (n - 1)<br>
+                s² = Σ(xᵢ - x̄)² / (n - 1)<br>
+                s² = ${cleanNum(ds.stats.varianceSum)} / (${ds.n} - 1)<br>
+                <span class="math-highlight">s² = ${cleanNum(ds.stats.variance)}</span>
+            </div>
+
+            <div class="math-formula">
+                <b>Desviación Estándar (s)</b> = Raíz cuadrada de la Varianza<br>
+                s = √s²<br>
+                s = √${cleanNum(ds.stats.variance)}<br>
+                <span class="math-highlight">s = ${cleanNum(ds.stats.stdDev)}</span>
+            </div>
+
+            <div class="math-formula">
+                <b>Coeficiente de Variación (CV)</b> = (Desviación Estándar / Media) * 100%<br>
+                CV = (${cleanNum(ds.stats.stdDev)} / ${cleanNum(ds.stats.mean)}) * 100%<br>
+                <span class="math-highlight">CV = ${cleanNum(ds.stats.cv, 2)}%</span>
+            </div>
+        </div>
+    `;
+    
+    content.innerHTML = html;
+    document.getElementById('procedureModal').classList.remove('hidden');
+});
+
+document.getElementById('closeProcedureModalBtn').addEventListener('click', () => {
+    document.getElementById('procedureModal').classList.add('hidden');
+});
+
+// ==========================================
+// CARRUSEL DE RENDERIZADO Y SINCRONIZACIÓN DE UI
 // ==========================================
 function renderCarousel() {
     const carousel = document.getElementById('resultsCarousel');
@@ -491,7 +545,6 @@ function renderCarousel() {
             </div>
         `;
 
-        // RESTRUCTURACIÓN A 1 SOLO ACORDEÓN CON 3 COLUMNAS
         let chartsHtml = `
             <div class="chart-accordion">
                 <div class="accordion-item">
@@ -527,6 +580,7 @@ function renderCarousel() {
 
     document.getElementById('resultsArea').classList.remove('hidden');
     document.getElementById('exportBtn').classList.remove('hidden');
+    document.getElementById('floatingProcedureBtn').classList.remove('hidden'); // Mostrar botón FAB
     
     carousel.scrollLeft = 0;
     updateCarouselControls();
