@@ -119,6 +119,18 @@ function generateFrequencyTable() {
     }
 }
 
+// Función auxiliar para crear filas con Tooltip de Fórmulas Matemáticas
+function createStatRow(label, value, formula) {
+    return `
+        <div class="stat-row">
+            <span class="tooltip">${label}
+                <span class="tooltiptext">${formula}</span>
+            </span>
+            <b>${value}</b>
+        </div>
+    `;
+}
+
 function renderWebStats() {
     const n = rawData.length;
     const sum = rawData.reduce((a, b) => a + b, 0);
@@ -153,39 +165,40 @@ function renderWebStats() {
     };
 
     let methodLabel = activeMethod === 'sturges' ? ' (Sturges)' : ' (Manual)';
+    let kFormula = activeMethod === 'sturges' ? 'k ≈ 1 + 3.322 · log₁₀(n)' : 'Asignado por el usuario';
 
     document.getElementById('statsArea').innerHTML = `
         <div class="stats-grid">
             <div class="stat-card">
                 <h3>Parámetros Base</h3>
-                <div class="stat-row"><span>Valor Mínimo:</span> <b>${cleanNum(minVal)}</b></div>
-                <div class="stat-row"><span>Valor Máximo:</span> <b>${cleanNum(maxVal)}</b></div>
-                <div class="stat-row"><span>Intervalos (k)${methodLabel}:</span> <b>${numClasses}</b></div>
-                <div class="stat-row"><span>Amplitud (A):</span> <b>${cleanNum(amplitude)}</b></div>
+                ${createStatRow('Valor Mínimo:', cleanNum(minVal), 'min(xᵢ)')}
+                ${createStatRow('Valor Máximo:', cleanNum(maxVal), 'max(xᵢ)')}
+                ${createStatRow(`Intervalos (k)${methodLabel}:`, numClasses, kFormula)}
+                ${createStatRow('Amplitud (A):', cleanNum(amplitude), 'A = Rango / k')}
             </div>
             <div class="stat-card">
                 <h3>Tendencia Central</h3>
-                <div class="stat-row"><span>Media Aritmética:</span> <b>${cleanNum(mean)}</b></div>
-                <div class="stat-row"><span>Media Geométrica:</span> <b>${cleanNum(geoMean)}</b></div>
-                <div class="stat-row"><span>Media Armónica:</span> <b>${cleanNum(harMean)}</b></div>
-                <div class="stat-row"><span>Mediana:</span> <b>${cleanNum(median)}</b></div>
-                <div class="stat-row"><span>Moda:</span> <b>${mode.map(m=>cleanNum(m)).join(', ')}</b></div>
+                ${createStatRow('Media Aritmética:', cleanNum(mean), 'x̄ = (Σxᵢ) / n')}
+                ${createStatRow('Media Geométrica:', cleanNum(geoMean), 'MG = ⁿ√(x₁·x₂···xₙ)')}
+                ${createStatRow('Media Armónica:', cleanNum(harMean), 'MH = n / Σ(1/xᵢ)')}
+                ${createStatRow('Mediana:', cleanNum(median), 'Me = Valor central ordenado')}
+                ${createStatRow('Moda:', mode.map(m=>cleanNum(m)).join(', '), 'Mo = Valor con mayor fᵢ')}
             </div>
             <div class="stat-card">
                 <h3>Dispersión y Forma</h3>
-                <div class="stat-row"><span>Rango:</span> <b>${cleanNum(range)}</b></div>
-                <div class="stat-row"><span>Varianza:</span> <b>${cleanNum(variance)}</b></div>
-                <div class="stat-row"><span>Desv. Estándar:</span> <b>${cleanNum(stdDev)}</b></div>
-                <div class="stat-row"><span>Coef. Variación (CV):</span> <b>${cleanNum(cv, 2)}%</b></div>
-                <div class="stat-row"><span>Asimetría:</span> <b>${cleanNum(skewness)}</b></div>
+                ${createStatRow('Rango:', cleanNum(range), 'R = x_max - x_min')}
+                ${createStatRow('Varianza:', cleanNum(variance), 's² = Σ(xᵢ - x̄)² / (n - 1)')}
+                ${createStatRow('Desv. Estándar:', cleanNum(stdDev), 's = √s²')}
+                ${createStatRow('Coef. Variación (CV):', cleanNum(cv, 2) + '%', 'CV = (s / x̄) · 100%')}
+                ${createStatRow('Asimetría:', cleanNum(skewness), 'As = [n/((n-1)(n-2))] · Σ[(xᵢ-x̄)/s]³')}
             </div>
             <div class="stat-card">
-                <h3>Posición (Cuartiles/Percentiles)</h3>
-                <div class="stat-row"><span>P10 (10%):</span> <b>${cleanNum(getP(10))}</b></div>
-                <div class="stat-row"><span>Q1 (25%):</span> <b>${cleanNum(getP(25))}</b></div>
-                <div class="stat-row"><span>Q2 (50%):</span> <b>${cleanNum(getP(50))}</b></div>
-                <div class="stat-row"><span>Q3 (75%):</span> <b>${cleanNum(getP(75))}</b></div>
-                <div class="stat-row"><span>P90 (90%):</span> <b>${cleanNum(getP(90))}</b></div>
+                <h3>Posición (Percentiles)</h3>
+                ${createStatRow('P10 (10%):', cleanNum(getP(10)), 'Pₖ = Valor en pos. 1+(k/100)(n-1)')}
+                ${createStatRow('Q1 (25%):', cleanNum(getP(25)), 'Q₁ = P₂₅')}
+                ${createStatRow('Q2 (50%):', cleanNum(getP(50)), 'Q₂ = P₅₀ = Mediana')}
+                ${createStatRow('Q3 (75%):', cleanNum(getP(75)), 'Q₃ = P₇₅')}
+                ${createStatRow('P90 (90%):', cleanNum(getP(90)), 'P₉₀')}
             </div>
         </div>
     `;
