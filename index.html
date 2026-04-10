@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Calculadora Estadística Avanzada</title>
+    <title>Generador de Tablas de Frecuencia</title>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
@@ -27,7 +27,7 @@
             align-items: center;
         }
 
-        .container { width: 100%; max-width: 900px; }
+        .container { width: 100%; max-width: 1000px; }
 
         h1, h2 {
             text-transform: uppercase;
@@ -75,7 +75,7 @@
         tr:nth-child(even) { background-color: var(--hover-bg); }
 
         .stats-grid {
-            display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
             gap: 20px; margin-bottom: 30px;
         }
 
@@ -111,7 +111,8 @@
             <table id="freqTable">
                 <thead>
                     <tr>
-                        <th>Clase (Intervalo)</th>
+                        <th>Límite Inf. (Li)</th>
+                        <th>Límite Sup. (Ls)</th>
                         <th>Marca de Clase (Xi)</th>
                         <th>Frec. Absoluta (fi)</th>
                         <th>Frec. Acumulada (Fi)</th>
@@ -130,7 +131,7 @@
         let numClasses = 0;
         let classesData = [];
 
-        // Utilidad para limpiar ceros decimales innecesarios
+        // Limpia decimales excesivos para la visualización en la web
         const cleanNum = (num, decimals = 4) => {
             if (isNaN(num)) return 0;
             const fixed = parseFloat(num.toFixed(decimals));
@@ -161,7 +162,7 @@
                     });
                 });
 
-                if (rawData.length === 0) return alert("No se encontraron números.");
+                if (rawData.length === 0) return alert("No se encontraron números en el archivo.");
 
                 rawData.sort((a, b) => a - b);
                 generateFrequencyTable();
@@ -201,13 +202,12 @@
                 let hi = count / n;
                 let Hi = cumulativeFreq / n;
 
-                let rowLabel = `[${cleanNum(currentMin, 2)} - ${cleanNum(currentMax, 2)}${isLast ? ']' : ')'}`;
-
-                classesData.push({ min: currentMin, max: currentMax, isLast, label: rowLabel, xi, fi: count, Fi: cumulativeFreq, hi, Hi });
+                classesData.push({ min: currentMin, max: currentMax, isLast, xi, fi: count, Fi: cumulativeFreq, hi, Hi });
 
                 tbody.innerHTML += `
                     <tr>
-                        <td>${rowLabel}</td>
+                        <td>${cleanNum(currentMin)}</td>
+                        <td>${cleanNum(currentMax)}</td>
                         <td>${cleanNum(xi)}</td>
                         <td>${count}</td>
                         <td>${cumulativeFreq}</td>
@@ -223,8 +223,6 @@
             const n = rawData.length;
             const sum = rawData.reduce((a, b) => a + b, 0);
             const mean = sum / n;
-            
-            // Medias adicionales
             const geoMean = Math.exp(rawData.reduce((sum, x) => sum + Math.log(x), 0) / n);
             const harMean = n / rawData.reduce((sum, x) => sum + (1 / x), 0);
 
@@ -292,7 +290,6 @@
             // --- HOJA 2: ANÁLISIS ---
             const ws = wb.addWorksheet('Análisis');
             
-            // Estilos generales
             const headerStyle = {
                 font: { bold: true, color: { argb: 'FFFFFFFF' } },
                 fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF000000' } },
@@ -300,49 +297,34 @@
                 border: { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} }
             };
 
-            const centerAlign = { alignment: { horizontal: 'center' } };
-
-            // Encabezados Tabla Frecuencia
-            const headers = ['CLASE (INTERVALO)', 'MARCA DE CLASE (XI)', 'FREC. ABSOLUTA (FI)', 'FREC. ACUMULADA (FI)', 'FREC. RELATIVA (HI)', 'FREC. REL. ACUM. (HI)'];
+            // Nuevos encabezados separados
+            const headers = ['LÍMITE INF. (LI)', 'LÍMITE SUP. (LS)', 'MARCA DE CLASE (XI)', 'FREC. ABSOLUTA (FI)', 'FREC. ACUMULADA (FI)', 'FREC. RELATIVA (HI)', 'FREC. REL. ACUM. (HI)'];
             ws.addRow(headers);
             ws.getRow(1).eachCell((cell) => { Object.assign(cell, headerStyle); });
 
-            // Rellenar Fórmulas en la Tabla de Frecuencias
+            // Rellenar Fórmulas Dinámicas referenciando a las celdas A y B
             classesData.forEach((cls, index) => {
+                let rowNum = index + 2; 
+                let conditionOperator = cls.isLast ? "<=" : "<";
+
                 const row = ws.addRow([
-                    cls.label, 
-                    { formula: `(${cls.min} + ${cls.max}) / 2`, result: cls.xi }, // Xi por fórmula simple
-                    // Frecuencia Absoluta (COUNTIFS de Excel)
-                    { 
-                        formula: `COUNTIFS(${dataRange}, ">=${cls.min}", ${dataRange}, "${cls.isLast ? '<=' : '<'}${cls.max}")`, 
-                        result: cls.fi 
-                    },
-                    // Frecuencia Acumulada
-                    index === 0 
-                        ? { formula: `C2`, result: cls.Fi } 
-                        : { formula: `D${index + 1} + C${index + 2}`, result: cls.Fi },
-                    // Frecuencia Relativa
-                    { formula: `C${index + 2} / COUNT(${dataRange})`, result: cls.hi },
-                    // Frecuencia Relativa Acumulada
-                    index === 0 
-                        ? { formula: `E2`, result: cls.Hi }
-                        : { formula: `F${index + 1} + E${index + 2}`, result: cls.Hi }
+                    cls.min, // A: Límite Inferior
+                    cls.max, // B: Límite Superior
+                    { formula: `(A${rowNum}+B${rowNum})/2`, result: cls.xi }, // C: Marca de clase (referenciada)
+                    { formula: `COUNTIFS(${dataRange},">="&A${rowNum},${dataRange},"${conditionOperator}"&B${rowNum})`, result: cls.fi }, // D: Frecuencia Absoluta (referenciada)
+                    index === 0 ? { formula: `D2`, result: cls.Fi } : { formula: `E${rowNum - 1}+D${rowNum}`, result: cls.Fi }, // E: Frecuencia Acumulada
+                    { formula: `D${rowNum}/COUNT(${dataRange})`, result: cls.hi }, // F: Frecuencia Relativa
+                    index === 0 ? { formula: `F2`, result: cls.Hi } : { formula: `G${rowNum - 1}+F${rowNum}`, result: cls.Hi } // G: Frecuencia Relativa Acumulada
                 ]);
 
-                // Formato numérico para eliminar ceros extra en Excel
-                row.getCell(2).numFmt = '0.####';
-                row.getCell(5).numFmt = '0.####';
-                row.getCell(6).numFmt = '0.####';
                 row.eachCell(cell => cell.alignment = { horizontal: 'center' });
             });
 
-            // Ajustar ancho columnas
             ws.columns.forEach(column => column.width = 22);
 
             // --- SECCIÓN DE ESTADÍSTICAS ---
             let startRow = numClasses + 4;
             
-            // Títulos de Estadísticas
             ws.getCell(`A${startRow}`).value = "TENDENCIA CENTRAL";
             ws.getCell(`C${startRow}`).value = "DISPERSIÓN";
             ws.getCell(`E${startRow}`).value = "POSICIÓN (CUARTILES)";
@@ -352,26 +334,26 @@
                 cell.border = { bottom: { style: 'medium' } };
             });
 
-            // Fórmulas Nativas de Excel para Estadísticas
+            // Usando fórmulas Clásicas de Excel para evitar #¿NOMBRE? o el prefijo =@ en diferentes idiomas
             const stats = [
-                { col1: 'A', lbl1: 'Media Aritmética:', f1: `AVERAGE(${dataRange})`, col2: 'C', lbl2: 'Rango:', f2: `MAX(${dataRange})-MIN(${dataRange})`, col3: 'E', lbl3: 'Q1 (25%):', f3: `QUARTILE.INC(${dataRange}, 1)` },
-                { col1: 'A', lbl1: 'Media Geométrica:', f1: `GEOMEAN(${dataRange})`, col2: 'C', lbl2: 'Varianza:', f2: `VAR.S(${dataRange})`, col3: 'E', lbl3: 'Q2 (50%):', f3: `MEDIAN(${dataRange})` },
-                { col1: 'A', lbl1: 'Media Armónica:', f1: `HARMEAN(${dataRange})`, col2: 'C', lbl2: 'Desv. Estándar:', f2: `STDEV.S(${dataRange})`, col3: 'E', lbl3: 'Q3 (75%):', f3: `QUARTILE.INC(${dataRange}, 3)` },
+                { col1: 'A', lbl1: 'Media Aritmética:', f1: `AVERAGE(${dataRange})`, col2: 'C', lbl2: 'Rango:', f2: `MAX(${dataRange})-MIN(${dataRange})`, col3: 'E', lbl3: 'Q1 (25%):', f3: `QUARTILE(${dataRange}, 1)` },
+                { col1: 'A', lbl1: 'Media Geométrica:', f1: `GEOMEAN(${dataRange})`, col2: 'C', lbl2: 'Varianza:', f2: `VAR(${dataRange})`, col3: 'E', lbl3: 'Q2 (50%):', f3: `MEDIAN(${dataRange})` },
+                { col1: 'A', lbl1: 'Media Armónica:', f1: `HARMEAN(${dataRange})`, col2: 'C', lbl2: 'Desv. Estándar:', f2: `STDEV(${dataRange})`, col3: 'E', lbl3: 'Q3 (75%):', f3: `QUARTILE(${dataRange}, 3)` },
                 { col1: 'A', lbl1: 'Mediana:', f1: `MEDIAN(${dataRange})`, col2: '', lbl2: '', f2: '', col3: '', lbl3: '', f3: '' },
-                { col1: 'A', lbl1: 'Moda:', f1: `MODE.SNGL(${dataRange})`, col2: '', lbl2: '', f2: '', col3: '', lbl3: '', f3: '' }
+                { col1: 'A', lbl1: 'Moda:', f1: `MODE(${dataRange})`, col2: '', lbl2: '', f2: '', col3: '', lbl3: '', f3: '' }
             ];
 
             stats.forEach((stat, i) => {
                 let r = startRow + 2 + i;
-                if(stat.lbl1) { ws.getCell(`${stat.col1}${r}`).value = stat.lbl1; ws.getCell(`B${r}`).value = { formula: stat.f1 }; ws.getCell(`B${r}`).numFmt = '0.####'; }
-                if(stat.lbl2) { ws.getCell(`${stat.col2}${r}`).value = stat.lbl2; ws.getCell(`D${r}`).value = { formula: stat.f2 }; ws.getCell(`D${r}`).numFmt = '0.####'; }
-                if(stat.lbl3) { ws.getCell(`${stat.col3}${r}`).value = stat.lbl3; ws.getCell(`F${r}`).value = { formula: stat.f3 }; ws.getCell(`F${r}`).numFmt = '0.####'; }
+                if(stat.lbl1) { ws.getCell(`${stat.col1}${r}`).value = stat.lbl1; ws.getCell(`B${r}`).value = { formula: stat.f1 }; }
+                if(stat.lbl2) { ws.getCell(`${stat.col2}${r}`).value = stat.lbl2; ws.getCell(`D${r}`).value = { formula: stat.f2 }; }
+                if(stat.lbl3) { ws.getCell(`${stat.col3}${r}`).value = stat.lbl3; ws.getCell(`F${r}`).value = { formula: stat.f3 }; }
             });
 
             // Generar archivo y descargar
             const buffer = await wb.xlsx.writeBuffer();
             const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-            saveAs(blob, 'Analisis_Estadistico_Avanzado.xlsx');
+            saveAs(blob, 'Analisis_Estadistico_Datos_Agrupados.xlsx');
         }
     </script>
 </body>
