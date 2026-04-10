@@ -7,6 +7,10 @@ let uploadedFilesMap = new Map();
 const MAX_DATASETS = 10;
 let currentSlide = 0;
 
+if (typeof Chart !== 'undefined' && typeof ChartBoxPlot !== 'undefined') {
+    Chart.register(ChartBoxPlot.BoxPlotController, ChartBoxPlot.BoxAndWiskers);
+}
+
 const cleanNum = (num, decimals = 4) => {
     if (isNaN(num)) return 0;
     const fixed = parseFloat(num.toFixed(decimals));
@@ -439,12 +443,8 @@ function renderChartsForDataset(ds, index) {
     });
 
     // 3. Diagrama de Caja y Bigotes (Box Plot)
+    // 3. Diagrama de Caja y Bigotes (Box Plot)
     try {
-        // FIX v1.6.3: Registro Diferido 100% seguro para garantizar que el CDN ya cargó
-        if (window.ChartBoxPlot) {
-            Chart.register(window.ChartBoxPlot);
-        }
-
         const ctxBox = document.getElementById(`chartBox-${index}`).getContext('2d');
         new Chart(ctxBox, {
             type: 'boxplot',
@@ -462,10 +462,14 @@ function renderChartsForDataset(ds, index) {
             },
             options: {
                 responsive: true,
-                indexAxis: 'y', // Formato horizontal (más elegante)
+                indexAxis: 'y', // Muestra la caja en formato horizontal (más elegante)
                 plugins: { legend: { display: false } }
             }
         });
+    } catch (e) {
+        console.error("Error cargando el BoxPlot:", e);
+        const container = document.getElementById(`chartBox-${index}`).parentElement;
+        container.innerHTML = `<p style="color:#a00000; text-align:center; padding:20px;">El Diagrama de Caja no pudo ser cargado por un error de red con la librería gráfica.</p>`;
     } catch (e) {
         console.error("Error cargando el BoxPlot:", e);
         const container = document.getElementById(`chartBox-${index}`).parentElement;
