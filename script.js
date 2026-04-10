@@ -1,93 +1,250 @@
-let rawData = [];
-let numClasses = 0;
-let classesData = [];
-let minVal = 0;
-let maxVal = 0;
-let amplitude = 0;
+// ==========================================
+// VARIABLES GLOBALES Y UTILIDADES
+// ==========================================
 let activeMethod = 'sturges'; 
+let globalDatasets = []; // Arreglo que guardará hasta 10 datasets
+const MAX_DATASETS = 10;
 
+// Utilidades Numéricas
 const cleanNum = (num, decimals = 4) => {
     if (isNaN(num)) return 0;
     const fixed = parseFloat(num.toFixed(decimals));
     return Number.isInteger(fixed) ? fixed : fixed;
 };
 
-// Activar/desactivar el input manual
-document.querySelectorAll('input[name="kMethod"]').forEach(radio => {
-    radio.addEventListener('change', (e) => {
+const getPercentile = (data, p) => {
+    const n = data.length;
+    const idx = (p / 100) * (n - 1);
+    const l = Math.floor(idx);
+    return l + 1 >= n ? data[l] : data[l] * (1 - (idx % 1)) + data[l + 1] * (idx % 1);
+};
+
+function createStatRow(label, value, formula) {
+    return `
+        <div class="stat-row">
+            <span class="tooltip">${label}<span class="tooltiptext">${formula}</span></span>
+            <b>${value}</b>
+        </div>
+    `;
+}
+
+// ==========================================
+// CONTROLADORES DE UI (MODOS E INPUTS)
+// ==========================================
+document.querySelectorAll('input[name="kMethod"]').forEach(r => {
+    r.addEventListener('change', (e) => {
         const inputManual = document.getElementById('kManualValue');
-        if (e.target.value === 'manual') {
-            inputManual.disabled = false;
-            inputManual.focus();
+        inputManual.disabled = e.target.value !== 'manual';
+        if (!inputManual.disabled) inputManual.focus();
+    });
+});
+
+document.querySelectorAll('input[name="uploadMode"]').forEach(r => {
+    r.addEventListener('change', (e) => {
+        const fileInput = document.getElementById('fileInput');
+        // Si es manual, restringir a 1 archivo
+        if(e.target.value === 'manual') {
+            fileInput.removeAttribute('multiple');
         } else {
-            inputManual.disabled = true;
+            fileInput.setAttribute('multiple', 'multiple');
         }
     });
 });
 
-document.getElementById('processBtn').addEventListener('click', processExcel);
-document.getElementById('exportBtn').addEventListener('click', exportToAdvancedExcel);
+document.getElementById('processBtn').addEventListener('click', handleProcessClick);
+document.getElementById('exportBtn').addEventListener('click', exportAllToExcel);
 
-function processExcel() {
+// ==========================================
+// LÓGICA PRINCIPAL DE PROCESAMIENTO
+// ==========================================
+async function handleProcessClick() {
     const fileInput = document.getElementById('fileInput');
-    if (!fileInput.files.length) {
-        alert("Sube un archivo Excel primero."); return;
-    }
-
+    const uploadMode = document.querySelector('input[name="uploadMode"]:checked').value;
     activeMethod = document.querySelector('input[name="kMethod"]:checked').value;
+
+    if (!fileInput.files.length) return alert("Sube al menos un archivo Excel.");
+    if (fileInput.files.length > MAX_DATASETS) return alert(`Límite excedido. Máximo ${MAX_DATASETS} archivos.`);
+    
     if (activeMethod === 'manual') {
         const manualK = parseInt(document.getElementById('kManualValue').value);
-        if (isNaN(manualK) || manualK < 1) {
-            alert("Por favor, ingresa un número de intervalos válido (mayor a 0).");
-            return;
-        }
+        if (isNaN(manualK) || manualK < 1) return alert("Ingresa un número de intervalos (k) válido.");
     }
 
-    const reader = new FileReader();
-    reader.onload = function(e) {
-        const data = new Uint8Array(e.target.result);
-        const workbook = XLSX.read(data, {type: 'array'});
-        const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-        const json = XLSX.utils.sheet_to_json(worksheet, {header: 1});
-        
-        rawData = [];
-        json.forEach(row => {
-            row.forEach(cell => {
-                let num = parseFloat(cell);
-                if (!isNaN(num)) rawData.push(num);
-            });
-        });
+    globalDatasets = []; // Reiniciar lotes
+    document.getElementById('resultsArea').innerHTML = '';
 
-        if (rawData.length === 0) return alert("No se encontraron números en el archivo.");
-
-        rawData.sort((a, b) => a - b);
-        generateFrequencyTable();
-        renderWebStats();
-        
-        document.getElementById('resultsArea').classList.remove('hidden');
-        document.getElementById('exportBtn').classList.remove('hidden');
-    };
-    reader.readAsArrayBuffer(fileInput.files[0]);
+    if (uploadMode === 'auto') {
+        // MODO AUTO: Leer todos los archivos subidos
+        for (let i = 0; i < fileInput.files.length; i++) {
+            const raw = await extractNumbersFromFile(fileInput.files[i]);
+            
+            // Detección Inteligente
+            if (raw.length < 5 && fileInput.files.length === 1) {
+                const conf = confirm("No se detectó una columna limpia de números. ¿Deseas abrir el archivo y seleccionar los datos visualmente?");
+                if(conf) {
+                    document.querySelector('input[value="manual"][name="uploadMode"]').checked = true;
+                    return openExcelModal(fileInput.files[0]);
+                }
+            }
+            
+            if (raw.length > 0) {
+                globalDatasets.push(calculateStatsForDataset(raw, `Archivo ${i+1}: ${fileInput.files[i].name}`));
+            }
+        }
+        renderAllDatasets();
+    } else {
+        // MODO MANUAL: Abrir modal con el primer archivo
+        openExcelModal(fileInput.files[0]);
+    }
 }
 
-function generateFrequencyTable() {
-    const n = rawData.length;
-    minVal = rawData[0];
-    maxVal = rawData[n - 1];
+function extractNumbersFromFile(file) {
+    return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const data = new Uint8Array(e.target.result);
+            const workbook = XLSX.read(data, {type: 'array'});
+            const json = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], {header: 1});
+            
+            let nums = [];
+            json.forEach(row => {
+                row.forEach(cell => {
+                    let num = parseFloat(cell);
+                    if (!isNaN(num)) nums.push(num);
+                });
+            });
+            resolve(nums);
+        };
+        reader.readAsArrayBuffer(file);
+    });
+}
+
+// ==========================================
+// LÓGICA DEL MODAL VISUAL (SELECCIÓN DE RANGOS)
+// ==========================================
+let preview2DArray = [];
+let isDragging = false;
+let startCell = null;
+let endCell = null;
+let savedRangesData = [];
+
+function openExcelModal(file) {
+    savedRangesData = [];
+    updateRangeCount();
+    
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, {type: 'array'});
+        preview2DArray = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], {header: 1, defval: ""});
+        
+        renderPreviewTable();
+        document.getElementById('previewModal').classList.remove('hidden');
+    };
+    reader.readAsArrayBuffer(file);
+}
+
+document.getElementById('closeModalBtn').onclick = () => document.getElementById('previewModal').classList.add('hidden');
+
+function renderPreviewTable() {
+    const container = document.getElementById('tableContainer');
+    let html = '<table id="interactiveTable">';
+    
+    preview2DArray.forEach((row, rIdx) => {
+        html += '<tr>';
+        row.forEach((cell, cIdx) => {
+            html += `<td data-r="${rIdx}" data-c="${cIdx}">${cell !== undefined ? cell : ''}</td>`;
+        });
+        html += '</tr>';
+    });
+    html += '</table>';
+    container.innerHTML = html;
+
+    const table = document.getElementById('interactiveTable');
+    table.addEventListener('mousedown', (e) => {
+        if(e.target.tagName === 'TD') {
+            isDragging = true;
+            startCell = { r: parseInt(e.target.dataset.r), c: parseInt(e.target.dataset.c) };
+            endCell = startCell;
+            highlightSelection();
+        }
+    });
+    table.addEventListener('mouseover', (e) => {
+        if(isDragging && e.target.tagName === 'TD') {
+            endCell = { r: parseInt(e.target.dataset.r), c: parseInt(e.target.dataset.c) };
+            highlightSelection();
+        }
+    });
+    window.addEventListener('mouseup', () => { isDragging = false; });
+}
+
+function highlightSelection() {
+    const tds = document.querySelectorAll('#interactiveTable td');
+    tds.forEach(td => td.classList.remove('cell-selected'));
+    
+    if(!startCell || !endCell) return;
+    
+    const minR = Math.min(startCell.r, endCell.r);
+    const maxR = Math.max(startCell.r, endCell.r);
+    const minC = Math.min(startCell.c, endCell.c);
+    const maxC = Math.max(startCell.c, endCell.c);
+
+    for(let r = minR; r <= maxR; r++) {
+        for(let c = minC; c <= maxC; c++) {
+            const cell = document.querySelector(`td[data-r="${r}"][data-c="${c}"]`);
+            if(cell && !cell.classList.contains('cell-saved')) cell.classList.add('cell-selected');
+        }
+    }
+}
+
+document.getElementById('saveRangeBtn').addEventListener('click', () => {
+    if(savedRangesData.length >= MAX_DATASETS) return alert(`Máximo ${MAX_DATASETS} rangos permitidos.`);
+    
+    const selected = document.querySelectorAll('.cell-selected');
+    if(selected.length === 0) return alert("Selecciona un rango arrastrando el ratón primero.");
+
+    let nums = [];
+    selected.forEach(td => {
+        let val = parseFloat(td.innerText);
+        if(!isNaN(val)) nums.push(val);
+        td.classList.remove('cell-selected');
+        td.classList.add('cell-saved');
+    });
+
+    if(nums.length === 0) return alert("No hay números válidos en tu selección.");
+
+    savedRangesData.push(nums);
+    updateRangeCount();
+});
+
+function updateRangeCount() {
+    document.getElementById('rangeCount').innerText = `Rangos guardados: ${savedRangesData.length}/${MAX_DATASETS}`;
+}
+
+document.getElementById('finishRangesBtn').addEventListener('click', () => {
+    if(savedRangesData.length === 0) return alert("No has guardado ningún rango.");
+    
+    globalDatasets = savedRangesData.map((raw, index) => calculateStatsForDataset(raw, `Conjunto Seleccionado ${index + 1}`));
+    document.getElementById('previewModal').classList.add('hidden');
+    renderAllDatasets();
+});
+
+
+// ==========================================
+// MOTOR ESTADÍSTICO POR LOTE
+// ==========================================
+function calculateStatsForDataset(raw, datasetName) {
+    let data = [...raw].sort((a, b) => a - b);
+    const n = data.length;
+    const minVal = data[0];
+    const maxVal = data[n - 1];
     const range = maxVal - minVal;
     
-    if (activeMethod === 'manual') {
-        numClasses = parseInt(document.getElementById('kManualValue').value);
-    } else {
-        numClasses = Math.round(1 + 3.322 * Math.log10(n));
-        if (numClasses < 1) numClasses = 1;
-    }
+    let numClasses = activeMethod === 'manual' ? parseInt(document.getElementById('kManualValue').value) : Math.round(1 + 3.322 * Math.log10(n));
+    if (numClasses < 1) numClasses = 1;
     
-    amplitude = range / numClasses;
-    const tbody = document.querySelector('#freqTable tbody');
-    tbody.innerHTML = '';
-    classesData = [];
-
+    const amplitude = range / numClasses;
+    let classesData = [];
     let currentMin = minVal;
     let cumulativeFreq = 0;
 
@@ -96,129 +253,114 @@ function generateFrequencyTable() {
         let isLast = (i === numClasses - 1);
         if (isLast) currentMax = maxVal; 
 
-        let count = rawData.filter(x => x >= currentMin && (isLast ? x <= currentMax : x < currentMax)).length;
+        let count = data.filter(x => x >= currentMin && (isLast ? x <= currentMax : x < currentMax)).length;
         let xi = (currentMin + currentMax) / 2;
         cumulativeFreq += count;
-        let hi = count / n;
-        let Hi = cumulativeFreq / n;
-
-        classesData.push({ min: currentMin, max: currentMax, isLast, xi, fi: count, Fi: cumulativeFreq, hi, Hi });
-
-        tbody.innerHTML += `
-            <tr>
-                <td>${cleanNum(currentMin)}</td>
-                <td>${cleanNum(currentMax)}</td>
-                <td>${cleanNum(xi)}</td>
-                <td>${count}</td>
-                <td>${cumulativeFreq}</td>
-                <td>${cleanNum(hi)}</td>
-                <td>${cleanNum(Hi)}</td>
-            </tr>
-        `;
+        
+        classesData.push({ min: currentMin, max: currentMax, isLast, xi, fi: count, Fi: cumulativeFreq, hi: count/n, Hi: cumulativeFreq/n });
         currentMin = currentMax;
     }
-}
 
-function createStatRow(label, value, formula) {
-    return `
-        <div class="stat-row">
-            <span class="tooltip">${label}
-                <span class="tooltiptext">${formula}</span>
-            </span>
-            <b>${value}</b>
-        </div>
-    `;
-}
-
-function renderWebStats() {
-    const n = rawData.length;
-    const sum = rawData.reduce((a, b) => a + b, 0);
+    // Estadísticas
+    const sum = data.reduce((a, b) => a + b, 0);
     const mean = sum / n;
-    const geoMean = Math.exp(rawData.reduce((s, x) => s + Math.log(x), 0) / n);
-    const harMean = n / rawData.reduce((s, x) => s + (1 / x), 0);
-    const mid = Math.floor(n / 2);
-    const median = n % 2 !== 0 ? rawData[mid] : (rawData[mid - 1] + rawData[mid]) / 2;
+    const geoMean = Math.exp(data.reduce((s, x) => s + Math.log(x), 0) / n);
+    const harMean = n / data.reduce((s, x) => s + (1 / x), 0);
+    const median = n % 2 !== 0 ? data[Math.floor(n/2)] : (data[Math.floor(n/2)-1] + data[Math.floor(n/2)]) / 2;
 
     let freqMap = {}; let maxFreq = 0; let mode = [];
-    rawData.forEach(num => {
-        freqMap[num] = (freqMap[num] || 0) + 1;
-        if (freqMap[num] > maxFreq) maxFreq = freqMap[num];
-    });
+    data.forEach(num => { freqMap[num] = (freqMap[num] || 0) + 1; if (freqMap[num] > maxFreq) maxFreq = freqMap[num]; });
     for (const key in freqMap) if (freqMap[key] === maxFreq) mode.push(Number(key));
 
-    const variance = rawData.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / (n - 1);
+    const variance = data.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / (n - 1);
     const stdDev = Math.sqrt(variance);
-    const range = maxVal - minVal;
     const cv = (stdDev / mean) * 100;
 
     let skewness = 0;
-    if (n > 2 && stdDev > 0) {
-        const sum3 = rawData.reduce((acc, val) => acc + Math.pow((val - mean) / stdDev, 3), 0);
-        skewness = (n / ((n - 1) * (n - 2))) * sum3;
-    }
+    if (n > 2 && stdDev > 0) skewness = (n / ((n - 1) * (n - 2))) * data.reduce((acc, val) => acc + Math.pow((val - mean) / stdDev, 3), 0);
 
-    const getP = (p) => {
-        const idx = (p / 100) * (n - 1);
-        const l = Math.floor(idx);
-        return l + 1 >= n ? rawData[l] : rawData[l] * (1 - (idx % 1)) + rawData[l + 1] * (idx % 1);
-    };
-
-    let methodLabel = activeMethod === 'sturges' ? ' (Sturges)' : ' (Manual)';
-    let kFormula = activeMethod === 'sturges' ? 'k ≈ 1 + 3.322 · log₁₀(n)' : 'Asignado por el usuario';
-
-    document.getElementById('statsArea').innerHTML = `
-        <div class="stats-grid">
-            <div class="stat-card">
-                <h3>Parámetros Base</h3>
-                ${createStatRow('Valor Mínimo:', cleanNum(minVal), 'min(xᵢ)')}
-                ${createStatRow('Valor Máximo:', cleanNum(maxVal), 'max(xᵢ)')}
-                ${createStatRow(`Intervalos (k)${methodLabel}:`, numClasses, kFormula)}
-                ${createStatRow('Amplitud (A):', cleanNum(amplitude), 'A = Rango / k')}
-            </div>
-            <div class="stat-card">
-                <h3>Tendencia Central</h3>
-                ${createStatRow('Media Aritmética:', cleanNum(mean), 'x̄ = (Σxᵢ) / n')}
-                ${createStatRow('Media Geométrica:', cleanNum(geoMean), 'MG = ⁿ√(x₁·x₂···xₙ)')}
-                ${createStatRow('Media Armónica:', cleanNum(harMean), 'MH = n / Σ(1/xᵢ)')}
-                ${createStatRow('Mediana:', cleanNum(median), 'Me = Lᵢ + A·[(n/2 - Fᵢ₋₁)/fᵢ]')}
-                ${createStatRow('Moda:', mode.map(m=>cleanNum(m)).join(', '), 'Mo = Lᵢ + A·[(fᵢ - fᵢ₋₁)/(2fᵢ - fᵢ₋₁ - fᵢ₊₁)]')}
-            </div>
-            <div class="stat-card">
-                <h3>Dispersión y Forma</h3>
-                ${createStatRow('Rango:', cleanNum(range), 'R = x_max - x_min')}
-                ${createStatRow('Varianza:', cleanNum(variance), 's² = Σ(xᵢ - x̄)² / (n - 1)')}
-                ${createStatRow('Desv. Estándar:', cleanNum(stdDev), 's = √s²')}
-                ${createStatRow('Coef. Variación (CV):', cleanNum(cv, 2) + '%', 'CV = (s / x̄) · 100%')}
-                ${createStatRow('Asimetría:', cleanNum(skewness), 'As = [n/((n-1)(n-2))] · Σ[(xᵢ-x̄)/s]³')}
-            </div>
-            <div class="stat-card">
-                <h3>Posición (Percentiles)</h3>
-                ${createStatRow('P10 (10%):', cleanNum(getP(10)), 'P₁₀ = Lᵢ + A·[(10n/100 - Fᵢ₋₁)/fᵢ]')}
-                ${createStatRow('Q1 (25%):', cleanNum(getP(25)), 'Q₁ = P₂₅')}
-                ${createStatRow('Q2 (50%):', cleanNum(getP(50)), 'Q₂ = P₅₀ = Mediana')}
-                ${createStatRow('Q3 (75%):', cleanNum(getP(75)), 'Q₃ = P₇₅')}
-                ${createStatRow('P90 (90%):', cleanNum(getP(90)), 'P₉₀ = Lᵢ + A·[(90n/100 - Fᵢ₋₁)/fᵢ]')}
-            </div>
-        </div>
-    `;
+    return { name: datasetName, data, n, minVal, maxVal, range, numClasses, amplitude, classesData, stats: { mean, geoMean, harMean, median, mode, variance, stdDev, cv, skewness, p10: getPercentile(data,10), q1: getPercentile(data,25), q2: getPercentile(data,50), q3: getPercentile(data,75), p90: getPercentile(data,90) }};
 }
 
-async function exportToAdvancedExcel() {
+// ==========================================
+// RENDERIZADO HTML MULTIPLE
+// ==========================================
+function renderAllDatasets() {
+    const resultsArea = document.getElementById('resultsArea');
+    resultsArea.innerHTML = '<h2>Resultados del Análisis</h2>';
+    
+    let kFormula = activeMethod === 'sturges' ? 'k ≈ 1 + 3.322 · log₁₀(n)' : 'Manual';
+    let methodLabel = activeMethod === 'sturges' ? ' (Sturges)' : ' (Manual)';
+
+    globalDatasets.forEach((ds, index) => {
+        let block = document.createElement('div');
+        block.className = 'dataset-block';
+        
+        let freqHtml = `
+            <h3>${ds.name} - Tabla de Frecuencias</h3>
+            <table>
+                <thead>
+                    <tr><th>Límite Inf. (Li)</th><th>Límite Sup. (Ls)</th><th>Marca de Clase (Xi)</th><th>Frec. Abs. (fi)</th><th>Frec. Acum. (Fi)</th><th>Frec. Rel. (hi)</th><th>Frec. Rel. Acum. (Hi)</th></tr>
+                </thead>
+                <tbody>
+        `;
+        
+        ds.classesData.forEach(c => {
+            freqHtml += `<tr><td>${cleanNum(c.min)}</td><td>${cleanNum(c.max)}</td><td>${cleanNum(c.xi)}</td><td>${c.fi}</td><td>${c.Fi}</td><td>${cleanNum(c.hi)}</td><td>${cleanNum(c.Hi)}</td></tr>`;
+        });
+        freqHtml += `</tbody></table>`;
+
+        let statsHtml = `
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <h3>Parámetros Base</h3>
+                    ${createStatRow('Mínimo:', cleanNum(ds.minVal), 'min(xᵢ)')}
+                    ${createStatRow('Máximo:', cleanNum(ds.maxVal), 'max(xᵢ)')}
+                    ${createStatRow(`Intervalos (k)${methodLabel}:`, ds.numClasses, kFormula)}
+                    ${createStatRow('Amplitud (A):', cleanNum(ds.amplitude), 'A = Rango / k')}
+                </div>
+                <div class="stat-card">
+                    <h3>Tendencia Central</h3>
+                    ${createStatRow('Media Arit.:', cleanNum(ds.stats.mean), 'x̄ = (Σxᵢ) / n')}
+                    ${createStatRow('Media Geom.:', cleanNum(ds.stats.geoMean), 'MG = ⁿ√(x₁···xₙ)')}
+                    ${createStatRow('Media Arm.:', cleanNum(ds.stats.harMean), 'MH = n / Σ(1/xᵢ)')}
+                    ${createStatRow('Mediana:', cleanNum(ds.stats.median), 'Me')}
+                    ${createStatRow('Moda:', ds.stats.mode.map(m=>cleanNum(m)).join(','), 'Mo')}
+                </div>
+                <div class="stat-card">
+                    <h3>Dispersión y Forma</h3>
+                    ${createStatRow('Rango:', cleanNum(ds.range), 'R = x_max - x_min')}
+                    ${createStatRow('Varianza:', cleanNum(ds.stats.variance), 's²')}
+                    ${createStatRow('Desv. Est.:', cleanNum(ds.stats.stdDev), 's = √s²')}
+                    ${createStatRow('C. Variación:', cleanNum(ds.stats.cv, 2) + '%', 'CV = (s/x̄)·100%')}
+                    ${createStatRow('Asimetría:', cleanNum(ds.stats.skewness), 'As')}
+                </div>
+                <div class="stat-card">
+                    <h3>Posición (Percentiles)</h3>
+                    ${createStatRow('P10 (10%):', cleanNum(ds.stats.p10), 'P₁₀')}
+                    ${createStatRow('Q1 (25%):', cleanNum(ds.stats.q1), 'Q₁')}
+                    ${createStatRow('Q2 (50%):', cleanNum(ds.stats.q2), 'Q₂')}
+                    ${createStatRow('Q3 (75%):', cleanNum(ds.stats.q3), 'Q₃')}
+                    ${createStatRow('P90 (90%):', cleanNum(ds.stats.p90), 'P₉₀')}
+                </div>
+            </div>
+        `;
+
+        block.innerHTML = freqHtml + statsHtml;
+        resultsArea.appendChild(block);
+    });
+
+    resultsArea.classList.remove('hidden');
+    document.getElementById('exportBtn').classList.remove('hidden');
+}
+
+// ==========================================
+// EXPORTACIÓN MÚLTIPLE A EXCELJS
+// ==========================================
+async function exportAllToExcel() {
     const wb = new ExcelJS.Workbook();
-    wb.creator = 'Generador Estadístico';
+    wb.creator = 'Generador Estadístico Lotes';
 
-    const wsDatos = wb.addWorksheet('Datos Base');
-    wsDatos.getCell('A1').value = "DATOS ORDENADOS";
-    wsDatos.getCell('A1').font = { bold: true, color: { argb: 'FFFFFFFF' } };
-    wsDatos.getCell('A1').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF000000' } };
-    
-    rawData.forEach((val, i) => { wsDatos.getCell(`A${i + 2}`).value = val; });
-    wsDatos.getColumn('A').width = 25;
-    const n = rawData.length;
-    const dataRange = `'Datos Base'!A2:A${n + 1}`;
-
-    const ws = wb.addWorksheet('Análisis');
-    
     const headerStyle = {
         font: { bold: true, color: { argb: 'FFFFFFFF' } },
         fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF000000' } },
@@ -226,62 +368,65 @@ async function exportToAdvancedExcel() {
         border: { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} }
     };
 
-    const headers = ['LÍMITE INF. (LI)', 'LÍMITE SUP. (LS)', 'MARCA DE CLASE (XI)', 'FREC. ABSOLUTA (FI)', 'FREC. ACUMULADA (FI)', 'FREC. RELATIVA (HI)', 'FREC. REL. ACUM. (HI)'];
-    ws.addRow(headers);
-    ws.getRow(1).eachCell((cell) => { Object.assign(cell, headerStyle); });
+    globalDatasets.forEach((ds, idx) => {
+        let shortName = ds.name.substring(0, 20).replace(/[:*?/"<>|]/g, ''); // Limpiar para tab de excel
+        
+        // Hoja de Datos
+        const wsDatos = wb.addWorksheet(`D_${idx+1}_${shortName}`);
+        wsDatos.getCell('A1').value = "DATOS ORDENADOS";
+        wsDatos.getCell('A1').font = headerStyle.font; wsDatos.getCell('A1').fill = headerStyle.fill;
+        ds.data.forEach((val, i) => { wsDatos.getCell(`A${i + 2}`).value = val; });
+        wsDatos.getColumn('A').width = 20;
+        
+        const dataRange = `'D_${idx+1}_${shortName}'!A2:A${ds.n + 1}`;
 
-    classesData.forEach((cls, index) => {
-        let rowNum = index + 2; 
-        let conditionOperator = cls.isLast ? "<=" : "<";
+        // Hoja de Análisis
+        const ws = wb.addWorksheet(`A_${idx+1}_${shortName}`);
+        const headers = ['LÍMITE INF. (LI)', 'LÍMITE SUP. (LS)', 'MARCA DE CLASE (XI)', 'FREC. ABS (FI)', 'FREC. ACUM (FI)', 'FREC. REL (HI)', 'FREC. REL ACUM (HI)'];
+        ws.addRow(headers);
+        ws.getRow(1).eachCell((cell) => { Object.assign(cell, headerStyle); });
 
-        const row = ws.addRow([
-            cls.min, cls.max,
-            { formula: `(A${rowNum}+B${rowNum})/2`, result: cls.xi },
-            { formula: `COUNTIFS(${dataRange},">="&A${rowNum},${dataRange},"${conditionOperator}"&B${rowNum})`, result: cls.fi },
-            index === 0 ? { formula: `D2`, result: cls.Fi } : { formula: `E${rowNum - 1}+D${rowNum}`, result: cls.Fi },
-            { formula: `D${rowNum}/COUNT(${dataRange})`, result: cls.hi },
-            index === 0 ? { formula: `F2`, result: cls.Hi } : { formula: `G${rowNum - 1}+F${rowNum}`, result: cls.Hi }
-        ]);
-        row.eachCell(cell => cell.alignment = { horizontal: 'center' });
-    });
+        ds.classesData.forEach((cls, i) => {
+            let rowNum = i + 2; 
+            let cond = cls.isLast ? "<=" : "<";
+            ws.addRow([
+                cls.min, cls.max,
+                { formula: `(A${rowNum}+B${rowNum})/2`, result: cls.xi },
+                { formula: `COUNTIFS(${dataRange},">="&A${rowNum},${dataRange},"${cond}"&B${rowNum})`, result: cls.fi },
+                i === 0 ? { formula: `D2`, result: cls.Fi } : { formula: `E${rowNum - 1}+D${rowNum}`, result: cls.Fi },
+                { formula: `D${rowNum}/COUNT(${dataRange})`, result: cls.hi },
+                i === 0 ? { formula: `F2`, result: cls.Hi } : { formula: `G${rowNum - 1}+F${rowNum}`, result: cls.Hi }
+            ]).eachCell(cell => cell.alignment = { horizontal: 'center' });
+        });
 
-    for(let i = 1; i <= 8; i++) { ws.getColumn(i).width = 24; }
+        for(let c = 1; c <= 8; c++) ws.getColumn(c).width = 20;
 
-    let startRow = numClasses + 4;
-    ws.getCell(`A${startRow}`).value = "PARÁMETROS BASE";
-    ws.getCell(`C${startRow}`).value = "TENDENCIA CENTRAL";
-    ws.getCell(`E${startRow}`).value = "DISPERSIÓN Y FORMA";
-    ws.getCell(`G${startRow}`).value = "POSICIÓN";
-    
-    [ws.getCell(`A${startRow}`), ws.getCell(`C${startRow}`), ws.getCell(`E${startRow}`), ws.getCell(`G${startRow}`)].forEach(cell => {
-        cell.font = { bold: true }; cell.border = { bottom: { style: 'medium' } };
-    });
+        let startRow = ds.numClasses + 4;
+        ws.getCell(`A${startRow}`).value = "PARÁMETROS"; ws.getCell(`C${startRow}`).value = "TENDENCIA C."; 
+        ws.getCell(`E${startRow}`).value = "DISPERSIÓN"; ws.getCell(`G${startRow}`).value = "POSICIÓN";
+        [ws.getCell(`A${startRow}`), ws.getCell(`C${startRow}`), ws.getCell(`E${startRow}`), ws.getCell(`G${startRow}`)].forEach(c => { c.font = { bold: true }; c.border = { bottom: { style: 'medium' } }; });
 
-    let formulaK = activeMethod === 'sturges' ? `ROUND(1+3.322*LOG10(COUNT(${dataRange})),0)` : numClasses;
-    let filaK = startRow + 4; 
-    let formulaAmplitud = `(MAX(${dataRange})-MIN(${dataRange}))/B${filaK}`;
+        let formulaK = activeMethod === 'sturges' ? `ROUND(1+3.322*LOG10(COUNT(${dataRange})),0)` : ds.numClasses;
+        let filaK = startRow + 4; 
+        let formAmp = `(MAX(${dataRange})-MIN(${dataRange}))/B${filaK}`;
 
-    const stats = [
-        { col1: 'A', lbl1: 'Valor Mínimo:', f1: `MIN(${dataRange})`, col2: 'C', lbl2: 'Media Aritmética:', f2: `AVERAGE(${dataRange})`, col3: 'E', lbl3: 'Rango:', f3: `MAX(${dataRange})-MIN(${dataRange})`, col4: 'G', lbl4: 'P10 (10%):', f4: `PERCENTILE(${dataRange}, 0.1)` },
-        { col1: 'A', lbl1: 'Valor Máximo:', f1: `MAX(${dataRange})`, col2: 'C', lbl2: 'Media Geométrica:', f2: `GEOMEAN(${dataRange})`, col3: 'E', lbl3: 'Varianza:', f3: `VAR(${dataRange})`, col4: 'G', lbl4: 'Q1 (25%):', f4: `QUARTILE(${dataRange}, 1)` },
-        { col1: 'A', lbl1: `N° Intervalos (k):`, f1: formulaK, col2: 'C', lbl2: 'Media Armónica:', f2: `HARMEAN(${dataRange})`, col3: 'E', lbl3: 'Desv. Estándar:', f3: `STDEV(${dataRange})`, col4: 'G', lbl4: 'Q2 (50%):', f4: `MEDIAN(${dataRange})` },
-        { col1: 'A', lbl1: 'Amplitud (A):', f1: formulaAmplitud, col2: 'C', lbl2: 'Mediana:', f2: `MEDIAN(${dataRange})`, col3: 'E', lbl3: 'Coef. Variación (CV):', f3: `STDEV(${dataRange})/AVERAGE(${dataRange})`, col4: 'G', lbl4: 'Q3 (75%):', f4: `QUARTILE(${dataRange}, 3)` },
-        { col1: 'A', lbl1: '', f1: '', col2: 'C', lbl2: 'Moda:', f2: `MODE(${dataRange})`, col3: 'E', lbl3: 'Asimetría:', f3: `SKEW(${dataRange})`, col4: 'G', lbl4: 'P90 (90%):', f4: `PERCENTILE(${dataRange}, 0.9)` }
-    ];
+        const statsGrid = [
+            { c1: 'A', l1: 'Mínimo:', f1: `MIN(${dataRange})`, c2: 'C', l2: 'Media Arit.:', f2: `AVERAGE(${dataRange})`, c3: 'E', l3: 'Rango:', f3: `MAX(${dataRange})-MIN(${dataRange})`, c4: 'G', l4: 'P10:', f4: `PERCENTILE(${dataRange}, 0.1)` },
+            { c1: 'A', l1: 'Máximo:', f1: `MAX(${dataRange})`, c2: 'C', l2: 'Media Geom.:', f2: `GEOMEAN(${dataRange})`, c3: 'E', l3: 'Varianza:', f3: `VAR(${dataRange})`, c4: 'G', l4: 'Q1 (25%):', f4: `QUARTILE(${dataRange}, 1)` },
+            { c1: 'A', l1: `Int. (k):`, f1: formulaK, c2: 'C', l2: 'Media Arm.:', f2: `HARMEAN(${dataRange})`, c3: 'E', l3: 'Desv. Est.:', f3: `STDEV(${dataRange})`, c4: 'G', l4: 'Q2 (50%):', f4: `MEDIAN(${dataRange})` },
+            { c1: 'A', l1: 'Amplitud:', f1: formAmp, c2: 'C', l2: 'Mediana:', f2: `MEDIAN(${dataRange})`, c3: 'E', l3: 'CV:', f3: `STDEV(${dataRange})/AVERAGE(${dataRange})`, c4: 'G', l4: 'Q3 (75%):', f4: `QUARTILE(${dataRange}, 3)` },
+            { c1: 'A', l1: '', f1: '', c2: 'C', l2: 'Moda:', f2: `MODE(${dataRange})`, c3: 'E', l3: 'Asimetría:', f3: `SKEW(${dataRange})`, c4: 'G', l4: 'P90:', f4: `PERCENTILE(${dataRange}, 0.9)` }
+        ];
 
-    stats.forEach((stat, i) => {
-        let r = startRow + 2 + i;
-        if(stat.lbl1) { ws.getCell(`${stat.col1}${r}`).value = stat.lbl1; ws.getCell(`B${r}`).value = (stat.col1 === 'A' && r === filaK && activeMethod === 'manual') ? stat.f1 : { formula: stat.f1 }; }
-        if(stat.lbl2) { ws.getCell(`${stat.col2}${r}`).value = stat.lbl2; ws.getCell(`D${r}`).value = { formula: stat.f2 }; }
-        if(stat.lbl3) { 
-            ws.getCell(`${stat.col3}${r}`).value = stat.lbl3; 
-            ws.getCell(`F${r}`).value = { formula: stat.f3 }; 
-            if (stat.lbl3 === 'Coef. Variación (CV):') ws.getCell(`F${r}`).numFmt = '0.00%';
-        }
-        if(stat.lbl4) { ws.getCell(`${stat.col4}${r}`).value = stat.lbl4; ws.getCell(`H${r}`).value = { formula: stat.f4 }; }
+        statsGrid.forEach((st, i) => {
+            let r = startRow + 2 + i;
+            if(st.l1) { ws.getCell(`${st.c1}${r}`).value = st.l1; ws.getCell(`B${r}`).value = (st.c1 === 'A' && r === filaK && activeMethod === 'manual') ? st.f1 : { formula: st.f1 }; }
+            if(st.l2) { ws.getCell(`${st.c2}${r}`).value = st.l2; ws.getCell(`D${r}`).value = { formula: st.f2 }; }
+            if(st.l3) { ws.getCell(`${st.c3}${r}`).value = st.l3; ws.getCell(`F${r}`).value = { formula: st.f3 }; if(st.l3 === 'CV:') ws.getCell(`F${r}`).numFmt = '0.00%'; }
+            if(st.l4) { ws.getCell(`${st.c4}${r}`).value = st.l4; ws.getCell(`H${r}`).value = { formula: st.f4 }; }
+        });
     });
 
     const buffer = await wb.xlsx.writeBuffer();
-    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-    saveAs(blob, 'Analisis_Estadistico_Avanzado.xlsx');
+    saveAs(new Blob([buffer]), 'Analisis_Lotes_Avanzado.xlsx');
 }
