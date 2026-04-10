@@ -119,7 +119,6 @@ function generateFrequencyTable() {
     }
 }
 
-// Función auxiliar para crear filas con Tooltip de Fórmulas Matemáticas
 function createStatRow(label, value, formula) {
     return `
         <div class="stat-row">
@@ -181,8 +180,8 @@ function renderWebStats() {
                 ${createStatRow('Media Aritmética:', cleanNum(mean), 'x̄ = (Σxᵢ) / n')}
                 ${createStatRow('Media Geométrica:', cleanNum(geoMean), 'MG = ⁿ√(x₁·x₂···xₙ)')}
                 ${createStatRow('Media Armónica:', cleanNum(harMean), 'MH = n / Σ(1/xᵢ)')}
-                ${createStatRow('Mediana:', cleanNum(median), 'Me = Valor central ordenado')}
-                ${createStatRow('Moda:', mode.map(m=>cleanNum(m)).join(', '), 'Mo = Valor con mayor fᵢ')}
+                ${createStatRow('Mediana:', cleanNum(median), 'Me = Lᵢ + A·[(n/2 - Fᵢ₋₁)/fᵢ]')}
+                ${createStatRow('Moda:', mode.map(m=>cleanNum(m)).join(', '), 'Mo = Lᵢ + A·[(fᵢ - fᵢ₋₁)/(2fᵢ - fᵢ₋₁ - fᵢ₊₁)]')}
             </div>
             <div class="stat-card">
                 <h3>Dispersión y Forma</h3>
@@ -194,11 +193,11 @@ function renderWebStats() {
             </div>
             <div class="stat-card">
                 <h3>Posición (Percentiles)</h3>
-                ${createStatRow('P10 (10%):', cleanNum(getP(10)), 'Pₖ = Valor en pos. 1+(k/100)(n-1)')}
+                ${createStatRow('P10 (10%):', cleanNum(getP(10)), 'P₁₀ = Lᵢ + A·[(10n/100 - Fᵢ₋₁)/fᵢ]')}
                 ${createStatRow('Q1 (25%):', cleanNum(getP(25)), 'Q₁ = P₂₅')}
                 ${createStatRow('Q2 (50%):', cleanNum(getP(50)), 'Q₂ = P₅₀ = Mediana')}
                 ${createStatRow('Q3 (75%):', cleanNum(getP(75)), 'Q₃ = P₇₅')}
-                ${createStatRow('P90 (90%):', cleanNum(getP(90)), 'P₉₀')}
+                ${createStatRow('P90 (90%):', cleanNum(getP(90)), 'P₉₀ = Lᵢ + A·[(90n/100 - Fᵢ₋₁)/fᵢ]')}
             </div>
         </div>
     `;
