@@ -7,7 +7,6 @@ let uploadedFilesMap = new Map();
 const MAX_DATASETS = 10;
 let currentSlide = 0;
 
-// Utilidades Numéricas
 const cleanNum = (num, decimals = 4) => {
     if (isNaN(num)) return 0;
     const fixed = parseFloat(num.toFixed(decimals));
@@ -41,7 +40,6 @@ document.querySelectorAll('input[name="kMethod"]').forEach(r => {
     });
 });
 
-// Selector de Modos (File, Paste)
 document.querySelectorAll('input[name="uploadMode"]').forEach(r => {
     r.addEventListener('change', (e) => {
         const fileInput = document.getElementById('fileInput');
@@ -384,6 +382,92 @@ function calculateStatsForDataset(raw, datasetName) {
 }
 
 // ==========================================
+// SISTEMA DE GRÁFICOS (CHART.JS)
+// ==========================================
+function renderChartsForDataset(ds, index) {
+    const labels = ds.classesData.map(c => cleanNum(c.xi));
+    const fiData = ds.classesData.map(c => c.fi);
+    const HiData = ds.classesData.map(c => c.Hi * 100);
+    const boxData = ds.data;
+
+    // 1. Histograma + Polígono
+    const ctxHist = document.getElementById(`chartHist-${index}`).getContext('2d');
+    new Chart(ctxHist, {
+        data: {
+            labels: labels,
+            datasets: [{
+                type: 'bar',
+                label: 'Frecuencia Absoluta (fi)',
+                data: fiData,
+                backgroundColor: 'rgba(0, 0, 0, 0.1)',
+                borderColor: '#000',
+                borderWidth: 1,
+                barPercentage: 1,
+                categoryPercentage: 1
+            }, {
+                type: 'line',
+                label: 'Polígono',
+                data: fiData,
+                borderColor: '#000',
+                borderWidth: 2,
+                tension: 0.1,
+                fill: false,
+                pointBackgroundColor: '#000'
+            }]
+        },
+        options: { responsive: true, scales: { y: { beginAtZero: true } } }
+    });
+
+    // 2. Ojiva
+    const ctxOjiva = document.getElementById(`chartOjiva-${index}`).getContext('2d');
+    new Chart(ctxOjiva, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Ojiva (Hi %)',
+                data: HiData,
+                borderColor: '#000',
+                borderWidth: 2,
+                fill: true,
+                backgroundColor: 'rgba(0, 0, 0, 0.05)',
+                tension: 0.3
+            }]
+        },
+        options: { responsive: true, scales: { y: { beginAtZero: true, max: 100 } } }
+    });
+
+    // 3. Diagrama de Caja y Bigotes (Box Plot)
+    const ctxBox = document.getElementById(`chartBox-${index}`).getContext('2d');
+    new Chart(ctxBox, {
+        type: 'boxplot',
+        data: {
+            labels: ['Distribución'],
+            datasets: [{
+                label: ds.name,
+                data: [boxData],
+                backgroundColor: 'rgba(0, 0, 0, 0.1)',
+                borderColor: '#000',
+                borderWidth: 2,
+                itemRadius: 3,
+                outlierBackgroundColor: '#000'
+            }]
+        },
+        options: {
+            responsive: true,
+            indexAxis: 'y', // Muestra la caja en formato horizontal (más elegante)
+            plugins: { legend: { display: false } }
+        }
+    });
+}
+
+// Función global para desplegar el acordeón
+window.toggleAccordion = function(header) {
+    const item = header.parentElement;
+    item.classList.toggle('active');
+};
+
+// ==========================================
 // CARRUSEL DE RENDERIZADO Y SINCRONIZACIÓN DE UI
 // ==========================================
 function renderCarousel() {
@@ -448,8 +532,43 @@ function renderCarousel() {
             </div>
         `;
 
-        block.innerHTML = freqHtml + statsHtml;
+        // NUEVO: Menú Acordeón para Gráficos
+        let chartsHtml = `
+            <div class="chart-accordion">
+                <div class="accordion-item">
+                    <div class="accordion-header" onclick="toggleAccordion(this)">
+                        <span>Histograma y Polígono de Frecuencias</span>
+                        <span class="accordion-arrow">▼</span>
+                    </div>
+                    <div class="accordion-content">
+                        <div class="chart-wrapper"><canvas id="chartHist-${index}"></canvas></div>
+                    </div>
+                </div>
+                <div class="accordion-item">
+                    <div class="accordion-header" onclick="toggleAccordion(this)">
+                        <span>Ojiva de Frecuencias (Menor que)</span>
+                        <span class="accordion-arrow">▼</span>
+                    </div>
+                    <div class="accordion-content">
+                        <div class="chart-wrapper"><canvas id="chartOjiva-${index}"></canvas></div>
+                    </div>
+                </div>
+                <div class="accordion-item">
+                    <div class="accordion-header" onclick="toggleAccordion(this)">
+                        <span>Diagrama de Caja y Bigotes (Box Plot)</span>
+                        <span class="accordion-arrow">▼</span>
+                    </div>
+                    <div class="accordion-content">
+                        <div class="chart-wrapper"><canvas id="chartBox-${index}"></canvas></div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        block.innerHTML = freqHtml + statsHtml + chartsHtml;
         carousel.appendChild(block);
+        
+        renderChartsForDataset(ds, index);
     });
 
     document.getElementById('resultsArea').classList.remove('hidden');
@@ -567,105 +686,4 @@ async function exportAllToExcel() {
 
     const buffer = await wb.xlsx.writeBuffer();
     saveAs(new Blob([buffer]), 'Analisis_Lotes_Avanzado.xlsx');
-}
-
-function renderChartsForDataset(ds, index) {
-    const labels = ds.classesData.map(c => cleanNum(c.xi));
-    const fiData = ds.classesData.map(c => c.fi);
-    const HiData = ds.classesData.map(c => c.Hi * 100);
-
-    // Configuración de Histograma + Polígono
-    const ctxHist = document.getElementById(`chartHist-${index}`).getContext('2d');
-    new Chart(ctxHist, {
-        data: {
-            labels: labels,
-            datasets: [{
-                type: 'bar',
-                label: 'Frecuencia Absoluta (fi)',
-                data: fiData,
-                backgroundColor: 'rgba(0, 0, 0, 0.1)',
-                borderColor: '#000',
-                borderWidth: 1,
-                barPercentage: 1,
-                categoryPercentage: 1
-            }, {
-                type: 'line',
-                label: 'Polígono de Frecuencia',
-                data: fiData,
-                borderColor: '#000',
-                borderWidth: 2,
-                tension: 0.1,
-                fill: false,
-                pointBackgroundColor: '#000'
-            }]
-        },
-        options: { responsive: true, scales: { y: { beginAtZero: true } } }
-    });
-
-    // Configuración de Ojiva
-    const ctxOjiva = document.getElementById(`chartOjiva-${index}`).getContext('2d');
-    new Chart(ctxOjiva, {
-        type: 'line',
-        data: {
-            labels: labels,
-            datasets: [{
-                label: 'Ojiva (Hi %)',
-                data: HiData,
-                borderColor: '#000',
-                borderWidth: 2,
-                fill: true,
-                backgroundColor: 'rgba(0, 0, 0, 0.05)',
-                tension: 0.3
-            }]
-        },
-        options: { responsive: true, scales: { y: { beginAtZero: true, max: 100 } } }
-    });
-}
-
-// Modificación en renderCarousel para incluir los canvas de los gráficos
-function renderCarousel() {
-    const carousel = document.getElementById('resultsCarousel');
-    carousel.innerHTML = '';
-    currentSlide = 0;
-    
-    let kFormula = activeMethod === 'sturges' ? 'k ≈ 1 + 3.322 · log₁₀(n)' : 'Manual';
-    let methodLabel = activeMethod === 'sturges' ? ' (Sturges)' : ' (Manual)';
-
-    globalDatasets.forEach((ds, index) => {
-        let block = document.createElement('div');
-        block.className = 'dataset-block';
-        
-        // ... (Contenido de tabla y stats se mantiene igual que v1.4.0)
-        let freqHtml = `<h3>Análisis ${index + 1}: ${ds.name}</h3><table><thead><tr><th>Límite Inf. (Li)</th><th>Límite Sup. (Ls)</th><th>Marca de Clase (Xi)</th><th>Frec. Abs. (fi)</th><th>Frec. Acum. (Fi)</th><th>Frec. Rel. (hi)</th><th>Frec. Rel. Acum. (Hi)</th></tr></thead><tbody>`;
-        ds.classesData.forEach(c => { freqHtml += `<tr><td>${cleanNum(c.min)}</td><td>${cleanNum(c.max)}</td><td>${cleanNum(c.xi)}</td><td>${c.fi}</td><td>${c.Fi}</td><td>${cleanNum(c.hi)}</td><td>${cleanNum(c.Hi)}</td></tr>`; });
-        freqHtml += `</tbody></table>`;
-
-        let statsHtml = `<div class="stats-grid"><div class="stat-card"><h3>Parámetros Base</h3>${createStatRow('Mínimo:', cleanNum(ds.minVal), 'min(xᵢ)')}${createStatRow('Máximo:', cleanNum(ds.maxVal), 'max(xᵢ)')}${createStatRow(`Intervalos (k)${methodLabel}:`, ds.numClasses, kFormula)}${createStatRow('Amplitud (A):', cleanNum(ds.amplitude), 'A = Rango / k')}</div><div class="stat-card"><h3>Tendencia Central</h3>${createStatRow('Media Arit.:', cleanNum(ds.stats.mean), 'x̄ = (Σxᵢ) / n')}${createStatRow('Media Geom.:', cleanNum(ds.stats.geoMean), 'MG = ⁿ√(x₁···xₙ)')}${createStatRow('Media Arm.:', cleanNum(ds.stats.harMean), 'MH = n / Σ(1/xᵢ)')}${createStatRow('Mediana:', cleanNum(ds.stats.median), 'Me = Lᵢ + A·[(n/2 - Fᵢ₋₁)/fᵢ]')}${createStatRow('Moda:', ds.stats.mode.map(m=>cleanNum(m)).join(','), 'Mo = Lᵢ + A·[(fᵢ - fᵢ₋₁)/(2fᵢ - fᵢ₋₁ - fᵢ₊₁)]')}</div><div class="stat-card"><h3>Dispersión y Forma</h3>${createStatRow('Rango:', cleanNum(ds.range), 'R = x_max - x_min')}${createStatRow('Varianza:', cleanNum(ds.stats.variance), 's² = Σ(xᵢ - x̄)² / (n - 1)')}${createStatRow('Desv. Est.:', cleanNum(ds.stats.stdDev), 's = √s²')}${createStatRow('C. Variación:', cleanNum(ds.stats.cv, 2) + '%', 'CV = (s/x̄)·100%')}${createStatRow('Asimetría:', cleanNum(ds.stats.skewness), 'As = [n/((n-1)(n-2))] · Σ[(xᵢ-x̄)/s]³')}</div><div class="stat-card"><h3>Posición (Percentiles)</h3>${createStatRow('P10 (10%):', cleanNum(ds.stats.p10), 'P₁₀ = Lᵢ + A·[(10n/100 - Fᵢ₋₁)/fᵢ]')}${createStatRow('Q1 (25%):', cleanNum(ds.stats.q1), 'Q₁')}${createStatRow('Q2 (50%):', cleanNum(ds.stats.q2), 'Q₂ = Mediana')}${createStatRow('Q3 (75%):', cleanNum(ds.stats.q3), 'Q₃')}${createStatRow('P90 (90%):', cleanNum(ds.stats.p90), 'P₉₀ = Lᵢ + A·[(90n/100 - Fᵢ₋₁)/fᵢ]')}</div></div>`;
-
-        // Añadir Grid de Gráficos al final del bloque
-        let chartsHtml = `
-            <div class="chart-grid">
-                <div class="chart-item">
-                    <h4>Histograma y Polígono</h4>
-                    <canvas id="chartHist-${index}"></canvas>
-                </div>
-                <div class="chart-item">
-                    <h4>Ojiva de Frecuencias</h4>
-                    <canvas id="chartOjiva-${index}"></canvas>
-                </div>
-            </div>
-        `;
-
-        block.innerHTML = freqHtml + statsHtml + chartsHtml;
-        carousel.appendChild(block);
-        
-        // Dibujar gráficos una vez el HTML está en el DOM
-        renderChartsForDataset(ds, index);
-    });
-
-    document.getElementById('resultsArea').classList.remove('hidden');
-    document.getElementById('exportBtn').classList.remove('hidden');
-    
-    carousel.scrollLeft = 0;
-    updateCarouselControls();
 }

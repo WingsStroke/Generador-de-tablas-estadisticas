@@ -134,3 +134,59 @@ tr:nth-child(even) { background-color: var(--hover-bg); }
         grid-template-columns: 1fr;
     }
 }
+
+.chart-accordion {
+    margin-top: 30px;
+    width: 100%;
+}
+
+.accordion-item {
+    border: 1px solid var(--border-color);
+    margin-bottom: 10px;
+    background-color: var(--bg-color);
+}
+
+.accordion-header {
+    padding: 15px 20px;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background-color: var(--hover-bg);
+    font-weight: bold;
+    text-transform: uppercase;
+    font-size: 14px;
+    transition: background-color 0.2s ease;
+}
+
+.accordion-header:hover {
+    background-color: var(--highlight-bg);
+}
+
+.accordion-arrow {
+    transition: transform 0.3s ease;
+    font-size: 12px;
+}
+
+.accordion-item.active .accordion-arrow {
+    transform: rotate(180deg);
+}
+
+.accordion-content {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.4s ease, padding 0.4s ease;
+    padding: 0 20px;
+}
+
+.accordion-item.active .accordion-content {
+    max-height: 800px; /* Espacio suficiente para que el gráfico se expanda */
+    padding: 20px;
+    border-top: 1px solid var(--border-color);
+}
+
+.chart-wrapper {
+    width: 100%;
+    max-width: 900px;
+    margin: 0 auto;
+}
