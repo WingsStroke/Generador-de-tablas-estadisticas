@@ -1,6 +1,5 @@
 import { cleanNum } from './math.js';
 
-// Función auxiliar para configurar los gráficos de la misma forma que en ui.js
 function getChartConfig(ds, type) {
     const labels = ds.classesData.map(c => cleanNum(c.xi));
     if (type === 'hist') return { type: 'bar', data: { labels, datasets: [ { type: 'bar', label: 'Frecuencia fi', data: ds.classesData.map(c => c.fi), backgroundColor: 'rgba(0, 0, 0, 0.1)', borderColor: '#000', borderWidth: 1, barPercentage: 1, categoryPercentage: 1 }, { type: 'line', label: 'Polígono', data: ds.classesData.map(c => c.fi), borderColor: '#000', borderWidth: 2, tension: 0.1, fill: false, pointBackgroundColor: '#000' } ] } };
@@ -8,14 +7,13 @@ function getChartConfig(ds, type) {
     if (type === 'box') return { type: 'boxplot', data: { labels: ['Distribución'], datasets: [{ label: ds.name, data: [ds.data], backgroundColor: 'rgba(0, 0, 0, 0.1)', borderColor: '#000', borderWidth: 2, itemRadius: 3, outlierBackgroundColor: '#000' }] } };
 }
 
-// Renderiza el gráfico en un canvas invisible para garantizar 100% de calidad
 async function captureChartBase64(dataset, chartType) {
     return new Promise((resolve) => {
         const container = document.createElement('div');
         container.style.width = '1000px';
         container.style.height = '500px';
         container.style.position = 'absolute';
-        container.style.left = '-9999px'; // Lo escondemos fuera de la pantalla
+        container.style.left = '-9999px'; 
         document.body.appendChild(container);
 
         const canvas = document.createElement('canvas');
@@ -24,7 +22,7 @@ async function captureChartBase64(dataset, chartType) {
         const config = getChartConfig(dataset, chartType);
         config.options = {
             responsive: false,
-            animation: false, // Fundamental: desactiva la animación para capturar al instante
+            animation: false, 
             plugins: { legend: { display: false } }
         };
         
@@ -34,7 +32,6 @@ async function captureChartBase64(dataset, chartType) {
         
         const chart = new Chart(canvas, config);
         
-        // Damos un pequeñísimo margen para que el navegador pinte el canvas
         setTimeout(() => {
             const base64 = canvas.toDataURL('image/png', 1.0);
             chart.destroy();
@@ -51,16 +48,13 @@ export async function exportToPDF(dataset) {
     btn.disabled = true;
 
     try {
-        // 1. Tomar capturas perfectas en segundo plano
         const imgHist = await captureChartBase64(dataset, 'hist');
         const imgOjiva = await captureChartBase64(dataset, 'ojiva');
         const imgBox = await captureChartBase64(dataset, 'box');
 
-        // 2. Inicializar jsPDF
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF();
         
-        // TÍTULO
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(18);
         doc.text(`REPORTE ESTADÍSTICO: ${dataset.name.toUpperCase()}`, 105, 20, { align: 'center' });
@@ -71,7 +65,6 @@ export async function exportToPDF(dataset) {
         doc.text('Generado por el Generador de Tablas de Frecuencia', 105, 26, { align: 'center' });
         doc.setTextColor(0);
 
-        // 3. TABLA DE FRECUENCIAS (Usando AutoTable)
         doc.setFontSize(12);
         doc.setFont('helvetica', 'bold');
         doc.text(`1. Tabla de Frecuencias ${dataset.isGrouped ? '(Datos Agrupados)' : '(Frecuencias Simples)'}`, 14, 40);
@@ -98,7 +91,6 @@ export async function exportToPDF(dataset) {
             margin: { left: 14, right: 14 }
         });
 
-        // 4. MEDIDAS ESTADÍSTICAS (Usando AutoTable en formato columna)
         let finalY = doc.lastAutoTable.finalY + 15;
         if (finalY > 230) { doc.addPage(); finalY = 20; }
 
@@ -129,7 +121,6 @@ export async function exportToPDF(dataset) {
             }
         });
 
-        // 5. INYECCIÓN DE GRÁFICOS
         doc.addPage();
         let currentY = 20;
         doc.setFontSize(12);
@@ -137,25 +128,21 @@ export async function exportToPDF(dataset) {
         doc.text('3. Gráficos Estadísticos', 14, currentY);
         currentY += 15;
 
-        // Inyectar Histograma
         doc.setFontSize(10);
         doc.setFont('helvetica', 'normal');
         doc.text('Histograma y Polígono de Frecuencias', 105, currentY, { align: 'center' });
         doc.addImage(imgHist, 'PNG', 15, currentY + 5, 180, 90);
         currentY += 110;
 
-        // Inyectar Ojiva
         if (currentY > 180) { doc.addPage(); currentY = 20; }
         doc.text('Ojiva (Menor que)', 105, currentY, { align: 'center' });
         doc.addImage(imgOjiva, 'PNG', 15, currentY + 5, 180, 90);
         currentY += 110;
 
-        // Inyectar Boxplot
         if (currentY > 180) { doc.addPage(); currentY = 20; }
         doc.text('Diagrama de Caja y Bigotes', 105, currentY, { align: 'center' });
         doc.addImage(imgBox, 'PNG', 15, currentY + 5, 180, 90);
 
-        // Guardar Archivo
         doc.save(`Reporte_Estadistico_${dataset.name.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.pdf`);
 
     } catch (error) {
