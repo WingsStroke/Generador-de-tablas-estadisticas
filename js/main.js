@@ -2,6 +2,7 @@ import { AppState } from './state.js';
 import { calculateStatsForDataset } from './math.js';
 import { extractNumbersFromFile, exportAllToExcel } from './excel.js';
 import { renderCarousel, openExcelModal, initUIListeners } from './ui.js';
+import { exportToPDF } from './pdf.js'; // NUEVA IMPORTACIÓN
 
 initUIListeners();
 
@@ -21,7 +22,6 @@ document.querySelectorAll('input[name="uploadMode"]').forEach(r => r.addEventLis
     }
 }));
 
-// Lógica para ocultar/mostrar panel de Intervalos
 document.querySelectorAll('input[name="tableType"]').forEach(r => r.addEventListener('change', (e) => {
     const intervalSettings = document.getElementById('intervalSettings');
     if (e.target.value === 'grouped') {
@@ -93,3 +93,11 @@ document.getElementById('processBtn').addEventListener('click', async () => {
 });
 
 document.getElementById('exportBtn').addEventListener('click', () => exportAllToExcel(AppState.globalDatasets, AppState.activeMethod));
+
+// NUEVO EVENTO PARA PDF
+document.getElementById('exportPdfBtn').addEventListener('click', () => {
+    const currentDataset = AppState.globalDatasets[AppState.currentSlide];
+    if(currentDataset) {
+        exportToPDF(currentDataset, AppState.currentSlide);
+    }
+});

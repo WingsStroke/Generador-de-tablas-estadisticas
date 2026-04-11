@@ -116,6 +116,7 @@ export function renderCarousel() {
 
     document.getElementById('resultsArea').classList.remove('hidden');
     document.getElementById('exportBtn').classList.remove('hidden');
+    document.getElementById('exportPdfBtn').classList.remove('hidden');
     document.getElementById('floatingProcedureBtn').classList.remove('hidden');
     carousel.scrollLeft = 0; updateCarouselControls();
 }

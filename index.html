@@ -11,7 +11,9 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@sgratzl/chartjs-chart-boxplot@4.4.2/build/index.umd.min.js"></script>
     
-    <link rel="stylesheet" href="styles.css?v=1.12.0">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    
+    <link rel="stylesheet" href="styles.css?v=1.14.0">
 </head>
 <body>
     <div class="container">
@@ -76,8 +78,9 @@
             </div>
 
             <div class="btn-group">
-                <button id="processBtn">1. Procesar Datos</button>
-                <button id="exportBtn" class="hidden">2. Descargar Excel Completo</button>
+                <button id="processBtn">Procesar Datos</button>
+                <button id="exportBtn" class="hidden">Descargar Excel Completo</button>
+                <button id="exportPdfBtn" class="hidden" style="background-color: #a00000; border-color: #800000;">Descargar Reporte PDF</button>
             </div>
         </div>
 
@@ -132,9 +135,9 @@
     </div>
 
     <button id="floatingProcedureBtn" class="floating-btn hidden">
-        <span style="font-size: 1.2em; vertical-align: middle;">📋</span> Ver Procedimiento
+        Ver Procedimiento
     </button>
 
-    <script type="module" src="js/main.js?v=1.12.0"></script>
+    <script type="module" src="js/main.js?v=1.14.0"></script>
 </body>
 </html>
