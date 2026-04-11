@@ -11,6 +11,51 @@ export const getPercentile = (data, p) => {
     return l + 1 >= n ? data[l] : data[l] * (1 - (idx % 1)) + data[l + 1] * (idx % 1);
 };
 
+export function calculateBivariateStats(dataX, dataY, nameX, nameY) {
+    // Tomamos la longitud más corta en caso de desajustes en columnas
+    const limit = Math.min(dataX.length, dataY.length);
+    let cleanX = [], cleanY = [];
+    
+    // Filtrar celdas vacías apareadas
+    for(let i=0; i<limit; i++) {
+        if(dataX[i] !== undefined && dataY[i] !== undefined) {
+            cleanX.push(String(dataX[i]).trim());
+            cleanY.push(String(dataY[i]).trim());
+        }
+    }
+
+    const uniqueX = [...new Set(cleanX)].sort();
+    const uniqueY = [...new Set(cleanY)].sort();
+
+    // Crear Matriz vacía
+    let matrix = {};
+    uniqueX.forEach(x => {
+        matrix[x] = {};
+        uniqueY.forEach(y => matrix[x][y] = 0);
+    });
+
+    // Llenar Matriz
+    for(let i=0; i<cleanX.length; i++) {
+        matrix[cleanX[i]][cleanY[i]]++;
+    }
+
+    // Totales Marginales
+    let rowTotals = {}; let colTotals = {}; let grandTotal = cleanX.length;
+    uniqueX.forEach(x => rowTotals[x] = 0);
+    uniqueY.forEach(y => colTotals[y] = 0);
+
+    uniqueX.forEach(x => {
+        uniqueY.forEach(y => {
+            rowTotals[x] += matrix[x][y];
+            colTotals[y] += matrix[x][y];
+        });
+    });
+
+    return {
+        type: 'bivariate', nameX, nameY, uniqueX, uniqueY, matrix, rowTotals, colTotals, grandTotal
+    };
+}
+
 export function calculateStatsForDataset(raw, datasetName, activeMethod, manualKValue, tableType) {
     let data = [...raw].sort((a, b) => a - b);
     const n = data.length;

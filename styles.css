@@ -244,3 +244,26 @@ tr:nth-child(even) { background-color: var(--hover-bg); }
     font-weight: bold;
     color: #a00000;
 }
+
+/* ESTILOS v2.0.0: TABLAS CRUZADAS BIVARIADAS */
+.cross-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 30px;
+    font-size: 14px;
+}
+.cross-table th {
+    background-color: #e0e0e0;
+    color: #000;
+    border: 1px solid var(--border-color);
+    padding: 10px;
+}
+.cross-table td {
+    border: 1px solid var(--border-color);
+    padding: 10px;
+    text-align: center;
+}
+.cross-table .total-cell {
+    font-weight: bold;
+    background-color: #f9f9f9;
+}

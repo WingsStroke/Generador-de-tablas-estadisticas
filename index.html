@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Generador Tablas de Frecuencia</title>
+    <title>Suite Estadística 2.0</title>
     
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
@@ -14,27 +14,33 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
     
-    <link rel="stylesheet" href="styles.css?v=1.16.0">
+    <link rel="stylesheet" href="styles.css?v=2.0.0">
 </head>
 <body>
     <div class="container">
-        <h1>Generador Tablas de Frecuencia</h1>
+        <h1>Suite de Análisis Estadístico</h1>
         
         <div class="controls">
+            <div class="settings-panel" style="border-color: #a00000; border-width: 2px;">
+                <h3 style="color: #a00000;">Nivel de Análisis</h3>
+                <label>
+                    <input type="radio" name="analysisMode" value="univariate" checked> 
+                    <span class="tooltip" style="font-weight: bold;">Univariado (1 Variable)
+                        <span class="tooltiptext">Análisis clásico de tendencia central, dispersión y posición.</span>
+                    </span>
+                </label>
+                <label>
+                    <input type="radio" name="analysisMode" value="bivariate"> 
+                    <span class="tooltip" style="font-weight: bold;">Bivariado (Tablas Cruzadas - 2 Variables)
+                        <span class="tooltiptext">Relaciona dos columnas para encontrar patrones conjuntos.</span>
+                    </span>
+                </label>
+            </div>
+
             <div class="mode-selector">
                 <h3>Modo de Importación</h3>
-                <label>
-                    <input type="radio" name="uploadMode" value="file" checked> 
-                    <span class="tooltip">Archivos Excel
-                        <span class="tooltiptext">Procesamiento Automático o Selección Manual por rangos</span>
-                    </span>
-                </label>
-                <label>
-                    <input type="radio" name="uploadMode" value="paste"> 
-                    <span class="tooltip">Pegar Texto Directamente
-                        <span class="tooltiptext">Copy-Paste</span>
-                    </span>
-                </label>
+                <label><input type="radio" name="uploadMode" value="file" checked> Archivos Excel</label>
+                <label><input type="radio" name="uploadMode" value="paste"> Pegar Texto Directamente</label>
             </div>
 
             <input type="file" id="fileInput" accept=".xlsx, .xls, .csv" multiple>
@@ -45,37 +51,21 @@
             </div>
 
             <div id="pasteArea" class="hidden">
-                <textarea id="pasteInput" placeholder="Pega tus datos aquí...&#10;Sepáralos usando: espacios, comas (,), punto y coma (;), slash (/) o saltos de línea.&#10;¡Recuerda usar punto (.) para los decimales!"></textarea>
+                <textarea id="pasteInput" placeholder="Pega tus datos aquí..."></textarea>
             </div>
             
-            <div class="settings-panel">
-                <h3>Tipo de Datos / Tabla</h3>
-                <label>
-                    <input type="radio" name="tableType" value="simple" checked> 
-                    <span class="tooltip">Frecuencias Simples (No Agrupados)
-                        <span class="tooltiptext">Ideal por defecto o para datos con pocos valores únicos.</span>
-                    </span>
-                </label>
-                <label>
-                    <input type="radio" name="tableType" value="grouped"> 
-                    <span class="tooltip">Frecuencias por Intervalos (Agrupados)
-                        <span class="tooltiptext">Utiliza límites inferiores y superiores.</span>
-                    </span>
-                </label>
-            </div>
+            <div id="univariateSettings">
+                <div class="settings-panel">
+                    <h3>Tipo de Datos / Tabla</h3>
+                    <label><input type="radio" name="tableType" value="simple" checked> Frecuencias Simples (No Agrupados)</label>
+                    <label><input type="radio" name="tableType" value="grouped"> Frecuencias por Intervalos (Agrupados)</label>
+                </div>
 
-            <div class="settings-panel hidden" id="intervalSettings">
-                <h3>Configuración de Intervalos</h3>
-                <label>
-                    <input type="radio" name="kMethod" value="sturges" checked> 
-                    <span class="tooltip">Automático
-                        <span class="tooltiptext">Regla de Sturges: k ≈ 1 + 3.322 · log₁₀(n)</span>
-                    </span>
-                </label>
-                <label>
-                    <input type="radio" name="kMethod" value="manual"> 
-                    Definir Manualmente: <input type="number" id="kManualValue" min="1" step="1" placeholder="Ej: 6" disabled>
-                </label>
+                <div class="settings-panel hidden" id="intervalSettings">
+                    <h3>Configuración de Intervalos</h3>
+                    <label><input type="radio" name="kMethod" value="sturges" checked> Automático (Sturges)</label>
+                    <label><input type="radio" name="kMethod" value="manual"> Definir Manualmente: <input type="number" id="kManualValue" min="1" step="1" disabled></label>
+                </div>
             </div>
 
             <div class="btn-group">
@@ -101,7 +91,7 @@
                 <h2 id="modalTitle">Previsualización de Excel</h2>
                 <span class="close-btn" id="closeModalBtn">&times;</span>
             </div>
-            <p><strong>Comandos:</strong> Haz clic y arrastra. Usa <b>SHIFT + Clic</b> para rangos largos. Usa <b>CTRL + Clic</b> individuales.</p>
+            <p><strong>Comandos:</strong> Haz clic y arrastra. Usa <b>SHIFT + Clic</b> para rangos largos.</p>
             <div class="range-controls">
                 <button id="saveRangeBtn">Guardar Rango</button>
                 <button id="clearSelectionBtn" class="btn-secondary">Limpiar Selección Activa</button>
@@ -110,6 +100,23 @@
                 <span id="rangeCount">Rangos guardados: 0/10</span>
             </div>
             <div id="tableContainer"></div>
+        </div>
+    </div>
+
+    <div id="bivariateModal" class="modal hidden">
+        <div class="modal-content" style="max-width: 600px; height: auto;">
+            <div class="modal-header">
+                <h2 id="bivariateModalTitle">Cruzar Variables (Tabla de Contingencia)</h2>
+                <span class="close-btn" id="closeBivariateModalBtn">&times;</span>
+            </div>
+            <p>Selecciona las dos columnas del archivo Excel que deseas relacionar:</p>
+            <div class="settings-panel" style="display:flex; flex-direction:column; gap:15px;">
+                <label><b>Variable X (Filas):</b> <select id="bivariateXSelect" style="width:100%; padding:8px; margin-top:5px;"></select></label>
+                <label><b>Variable Y (Columnas):</b> <select id="bivariateYSelect" style="width:100%; padding:8px; margin-top:5px;"></select></label>
+            </div>
+            <div style="text-align: right; margin-top: 20px;">
+                <button id="saveBivariateBtn" style="background-color: #a00000; border-color: #800000;">Guardar Cruce</button>
+            </div>
         </div>
     </div>
 
@@ -135,10 +142,8 @@
         </div>
     </div>
 
-    <button id="floatingProcedureBtn" class="floating-btn hidden">
-        Ver Procedimiento
-    </button>
+    <button id="floatingProcedureBtn" class="floating-btn hidden">Ver Procedimiento</button>
 
-    <script type="module" src="js/main.js?v=1.16.0"></script>
+    <script type="module" src="js/main.js?v=2.0.0"></script>
 </body>
 </html>

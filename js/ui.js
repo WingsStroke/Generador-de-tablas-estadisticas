@@ -42,7 +42,7 @@ function createStatRow(label, value, formula) {
 }
 
 export function updateCarouselControls() {
-    document.getElementById('carouselIndicator').innerText = `Tabla ${AppState.currentSlide + 1} de ${AppState.globalDatasets.length}`;
+    document.getElementById('carouselIndicator').innerText = `Análisis ${AppState.currentSlide + 1} de ${AppState.globalDatasets.length}`;
     document.getElementById('prevBtn').disabled = AppState.currentSlide === 0;
     document.getElementById('nextBtn').disabled = AppState.currentSlide === AppState.globalDatasets.length - 1;
 }
@@ -54,70 +54,133 @@ export function renderCarousel() {
     AppState.globalDatasets.forEach((ds, index) => {
         let block = document.createElement('div'); block.className = 'dataset-block';
         
-        let kFormula = AppState.activeMethod === 'sturges' ? 'k ≈ 1 + 3.322 · log₁₀(n)' : 'Manual';
-        let methodLabel = AppState.activeMethod === 'sturges' ? ' - Sturges' : ' - Manual';
+        if (ds.type === 'bivariate') {
+            let html = `<h3>Análisis Bivariado: ${ds.nameX} (Filas) vs ${ds.nameY} (Columnas)</h3>`;
+            
+            html += `<div style="overflow-x: auto;"><table class="cross-table"><thead><tr><th>X \\ Y</th>`;
+            ds.uniqueY.forEach(y => html += `<th>${y}</th>`);
+            html += `<th class="total-cell">Total Fila</th></tr></thead><tbody>`;
+            
+            ds.uniqueX.forEach(x => {
+                html += `<tr><th>${x}</th>`;
+                ds.uniqueY.forEach(y => {
+                    html += `<td>${ds.matrix[x][y]}</td>`;
+                });
+                html += `<td class="total-cell">${ds.rowTotals[x]}</td></tr>`;
+            });
+            
+            html += `<tr><th class="total-cell">Total Columna</th>`;
+            ds.uniqueY.forEach(y => html += `<td class="total-cell">${ds.colTotals[y]}</td>`);
+            html += `<td class="total-cell" style="background:#333; color:#fff;">${ds.grandTotal}</td></tr></tbody></table></div>`;
 
-        let freqHtml = `<h3>Análisis ${index + 1}: ${ds.name} <span style="font-size:13px; font-weight:normal; color:#666;">(${ds.isGrouped ? 'Datos Agrupados' : 'Frecuencias Simples'})</span></h3><table><thead><tr>`;
-        if (ds.isGrouped) {
-            freqHtml += `<th>Límite Inf. (Li)</th><th>Límite Sup. (Ls)</th><th>Marca de Clase (Xi)</th>`;
+            html += `
+            <div class="stats-grid">
+                <div class="stat-card" style="grid-column: 1 / -1; border-left: 4px solid #a00000;">
+                    <h3 style="color:#a00000;">Analista Automático</h3>
+                    <p style="font-size:14px; line-height:1.6;">Se cruzaron un total de <b>${ds.grandTotal} registros válidos</b>. La matriz muestra la frecuencia conjunta de los datos. Observa las celdas con mayores valores para identificar la intersección más fuerte entre la variable <i>${ds.nameX}</i> y la variable <i>${ds.nameY}</i>. El gráfico de barras apiladas a continuación te ayudará a visualizar qué categoría de la columna predomina dentro de cada categoría de la fila.</p>
+                </div>
+            </div>`;
+
+            html += `<h3 style="margin-top:30px; border-bottom:1px solid #ccc; padding-bottom:5px;">Gráfico de Barras Apiladas (Composición)</h3>`;
+            html += `<div class="chart-canvas-wrapper" style="height:400px; margin-bottom:40px;"><canvas id="chartBivariate-${index}"></canvas></div>`;
+
+            block.innerHTML = html; carousel.appendChild(block);
+
+            setTimeout(() => {
+                const ctx = document.getElementById(`chartBivariate-${index}`).getContext('2d');
+                const colors = ['#a00000', '#0000a0', '#00a000', '#e6a800', '#660066', '#006666', '#555555', '#ff6600'];
+                
+                const datasets = ds.uniqueY.map((y, i) => {
+                    return {
+                        label: String(y),
+                        data: ds.uniqueX.map(x => ds.matrix[x][y]),
+                        backgroundColor: colors[i % colors.length]
+                    };
+                });
+
+                new Chart(ctx, {
+                    type: 'bar',
+                    data: { labels: ds.uniqueX.map(String), datasets },
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        plugins: { legend: { display: true, position: 'bottom' } },
+                        scales: { x: { stacked: true }, y: { stacked: true } }
+                    }
+                });
+            }, 0);
+
         } else {
-            freqHtml += `<th>Dato (Xi)</th>`;
-        }
-        freqHtml += `<th>Frec. Abs. (fi)</th><th>Frec. Acum. (Fi)</th><th>Frec. Rel. (hi)</th><th>Frec. Rel. Acum. (Hi)</th></tr></thead><tbody>`;
-        
-        ds.classesData.forEach(c => { 
-            freqHtml += `<tr>`;
+            let kFormula = AppState.activeMethod === 'sturges' ? 'k ≈ 1 + 3.322 · log₁₀(n)' : 'Manual';
+            let methodLabel = AppState.activeMethod === 'sturges' ? ' - Sturges' : ' - Manual';
+
+            let freqHtml = `<h3>Análisis ${index + 1}: ${ds.name} <span style="font-size:13px; font-weight:normal; color:#666;">(${ds.isGrouped ? 'Datos Agrupados' : 'Frecuencias Simples'})</span></h3><table><thead><tr>`;
             if (ds.isGrouped) {
-                freqHtml += `<td>${cleanNum(c.min)}</td><td>${cleanNum(c.max)}</td>`;
+                freqHtml += `<th>Límite Inf. (Li)</th><th>Límite Sup. (Ls)</th><th>Marca de Clase (Xi)</th>`;
+            } else {
+                freqHtml += `<th>Dato (Xi)</th>`;
             }
-            freqHtml += `<td>${cleanNum(c.xi)}</td><td>${c.fi}</td><td>${c.Fi}</td><td>${cleanNum(c.hi)}</td><td>${cleanNum(c.Hi)}</td></tr>`; 
-        });
-        freqHtml += `</tbody></table>`;
+            freqHtml += `<th>Frec. Abs. (fi)</th><th>Frec. Acum. (Fi)</th><th>Frec. Rel. (hi)</th><th>Frec. Rel. Acum. (Hi)</th></tr></thead><tbody>`;
+            
+            ds.classesData.forEach(c => { 
+                freqHtml += `<tr>`;
+                if (ds.isGrouped) {
+                    freqHtml += `<td>${cleanNum(c.min)}</td><td>${cleanNum(c.max)}</td>`;
+                }
+                freqHtml += `<td>${cleanNum(c.xi)}</td><td>${c.fi}</td><td>${c.Fi}</td><td>${cleanNum(c.hi)}</td><td>${cleanNum(c.Hi)}</td></tr>`; 
+            });
+            freqHtml += `</tbody></table>`;
 
-        let statsHtml = `<div class="stats-grid">
-            <div class="stat-card">
-                <h3>Parámetros Base</h3>
-                ${createStatRow('Mínimo:', cleanNum(ds.minVal), 'min(xᵢ)')}
-                ${createStatRow('Máximo:', cleanNum(ds.maxVal), 'max(xᵢ)')}
-                ${ds.isGrouped ? createStatRow(`Intervalos k${methodLabel}:`, ds.numClasses, kFormula) : createStatRow('Valores Únicos:', ds.uniqueValsCount, 'No agrupados')}
-                ${ds.isGrouped ? createStatRow('Amplitud A:', cleanNum(ds.amplitude), 'A = Rango / k') : ''}
-            </div>
-            <div class="stat-card">
-                <h3>Tendencia Central</h3>
-                ${createStatRow('Media Aritmética:', cleanNum(ds.stats.mean), 'x̄ = (Σxᵢ) / n')}
-                ${createStatRow('Media Geométrica:', cleanNum(ds.stats.geoMean), 'MG = ⁿ√(x₁···xₙ)')}
-                ${createStatRow('Media Armónica:', cleanNum(ds.stats.harMean), 'MH = n / Σ(1/xᵢ)')}
-                ${createStatRow('Mediana:', cleanNum(ds.stats.median), ds.isGrouped ? 'Me = Lᵢ + A·[(n/2 - Fᵢ₋₁)/fᵢ]' : 'Valor central')}
-                ${createStatRow('Moda:', ds.stats.mode.map(m=>cleanNum(m)).join(','), ds.isGrouped ? 'Mo = Lᵢ + A·[(fᵢ - fᵢ₋₁)/(2fᵢ - fᵢ₋₁ - fᵢ₊₁)]' : 'Valor más repetido')}
-            </div>
-            <div class="stat-card">
-                <h3>Dispersión y Forma</h3>
-                ${createStatRow('Rango:', cleanNum(ds.range), 'R = x_max - x_min')}
-                ${createStatRow('Varianza:', cleanNum(ds.stats.variance), 's² = Σ(xᵢ - x̄)² / (n - 1)')}
-                ${createStatRow('Desviación Estándar:', cleanNum(ds.stats.stdDev), 's = √s²')}
-                ${createStatRow('Coeficiente Variación:', cleanNum(ds.stats.cv, 2) + '%', 'CV = (s/x̄)·100%')}
-                ${createStatRow('Asimetría:', cleanNum(ds.stats.skewness), 'As = [n/((n-1)(n-2))] · Σ[(xᵢ-x̄)/s]³')}
-            </div>
-            <div class="stat-card">
-                <h3>Posición</h3>
-                ${createStatRow('Percentil 10:', cleanNum(ds.stats.p10), 'P₁₀ = Lᵢ + A·[(10n/100 - Fᵢ₋₁)/fᵢ]')}
-                ${createStatRow('Cuartil 1:', cleanNum(ds.stats.q1), 'Q₁ = Lᵢ + A·[(n/4 - Fᵢ₋₁)/fᵢ]')}
-                ${createStatRow('Cuartil 2:', cleanNum(ds.stats.q2), 'Q₂ = Mediana')}
-                ${createStatRow('Cuartil 3:', cleanNum(ds.stats.q3), 'Q₃ = Lᵢ + A·[(3n/4 - Fᵢ₋₁)/fᵢ]')}
-                ${createStatRow('Percentil 90:', cleanNum(ds.stats.p90), 'P₉₀ = Lᵢ + A·[(90n/100 - Fᵢ₋₁)/fᵢ]')}
-            </div>
-        </div>`;
+            let statsHtml = `<div class="stats-grid">
+                <div class="stat-card">
+                    <h3>Parámetros Base</h3>
+                    ${createStatRow('Mínimo:', cleanNum(ds.minVal), 'min(xᵢ)')}
+                    ${createStatRow('Máximo:', cleanNum(ds.maxVal), 'max(xᵢ)')}
+                    ${ds.isGrouped ? createStatRow(`Intervalos k${methodLabel}:`, ds.numClasses, kFormula) : createStatRow('Valores Únicos:', ds.uniqueValsCount, 'No agrupados')}
+                    ${ds.isGrouped ? createStatRow('Amplitud A:', cleanNum(ds.amplitude), 'A = Rango / k') : ''}
+                </div>
+                <div class="stat-card">
+                    <h3>Tendencia Central</h3>
+                    ${createStatRow('Media Aritmética:', cleanNum(ds.stats.mean), 'x̄ = (Σxᵢ) / n')}
+                    ${createStatRow('Media Geométrica:', cleanNum(ds.stats.geoMean), 'MG = ⁿ√(x₁···xₙ)')}
+                    ${createStatRow('Media Armónica:', cleanNum(ds.stats.harMean), 'MH = n / Σ(1/xᵢ)')}
+                    ${createStatRow('Mediana:', cleanNum(ds.stats.median), ds.isGrouped ? 'Me = Lᵢ + A·[(n/2 - Fᵢ₋₁)/fᵢ]' : 'Valor central')}
+                    ${createStatRow('Moda:', ds.stats.mode.map(m=>cleanNum(m)).join(','), ds.isGrouped ? 'Mo = Lᵢ + A·[(fᵢ - fᵢ₋₁)/(2fᵢ - fᵢ₋₁ - fᵢ₊₁)]' : 'Valor más repetido')}
+                </div>
+                <div class="stat-card">
+                    <h3>Dispersión y Forma</h3>
+                    ${createStatRow('Rango:', cleanNum(ds.range), 'R = x_max - x_min')}
+                    ${createStatRow('Varianza:', cleanNum(ds.stats.variance), 's² = Σ(xᵢ - x̄)² / (n - 1)')}
+                    ${createStatRow('Desviación Estándar:', cleanNum(ds.stats.stdDev), 's = √s²')}
+                    ${createStatRow('Coeficiente Variación:', cleanNum(ds.stats.cv, 2) + '%', 'CV = (s/x̄)·100%')}
+                    ${createStatRow('Asimetría:', cleanNum(ds.stats.skewness), 'As = [n/((n-1)(n-2))] · Σ[(xᵢ-x̄)/s]³')}
+                </div>
+                <div class="stat-card">
+                    <h3>Posición</h3>
+                    ${createStatRow('Percentil 10:', cleanNum(ds.stats.p10), 'P₁₀ = Lᵢ + A·[(10n/100 - Fᵢ₋₁)/fᵢ]')}
+                    ${createStatRow('Cuartil 1:', cleanNum(ds.stats.q1), 'Q₁ = Lᵢ + A·[(n/4 - Fᵢ₋₁)/fᵢ]')}
+                    ${createStatRow('Cuartil 2:', cleanNum(ds.stats.q2), 'Q₂ = Mediana')}
+                    ${createStatRow('Cuartil 3:', cleanNum(ds.stats.q3), 'Q₃ = Lᵢ + A·[(3n/4 - Fᵢ₋₁)/fᵢ]')}
+                    ${createStatRow('Percentil 90:', cleanNum(ds.stats.p90), 'P₉₀ = Lᵢ + A·[(90n/100 - Fᵢ₋₁)/fᵢ]')}
+                </div>
+            </div>`;
 
-        let chartsHtml = `<div class="chart-accordion"><div class="accordion-item"><div class="accordion-header" onclick="toggleAccordion(this)"><span>Gráficos Estadísticos - Clic para ampliar</span><span class="accordion-arrow">▼</span></div><div class="accordion-content"><div class="chart-grid"><div class="chart-item" onclick="openChartModal(${index}, 'hist')"><h4>Histograma</h4><div class="chart-canvas-wrapper"><canvas id="chartHist-${index}"></canvas></div></div><div class="chart-item" onclick="openChartModal(${index}, 'ojiva')"><h4>Ojiva</h4><div class="chart-canvas-wrapper"><canvas id="chartOjiva-${index}"></canvas></div></div><div class="chart-item" onclick="openChartModal(${index}, 'box')"><h4>Caja y Bigotes</h4><div class="chart-canvas-wrapper"><canvas id="chartBox-${index}"></canvas></div></div></div></div></div></div>`;
+            let chartsHtml = `<div class="chart-accordion"><div class="accordion-item"><div class="accordion-header" onclick="toggleAccordion(this)"><span>Gráficos Estadísticos - Clic para ampliar</span><span class="accordion-arrow">▼</span></div><div class="accordion-content"><div class="chart-grid"><div class="chart-item" onclick="openChartModal(${index}, 'hist')"><h4>Histograma</h4><div class="chart-canvas-wrapper"><canvas id="chartHist-${index}"></canvas></div></div><div class="chart-item" onclick="openChartModal(${index}, 'ojiva')"><h4>Ojiva</h4><div class="chart-canvas-wrapper"><canvas id="chartOjiva-${index}"></canvas></div></div><div class="chart-item" onclick="openChartModal(${index}, 'box')"><h4>Caja y Bigotes</h4><div class="chart-canvas-wrapper"><canvas id="chartBox-${index}"></canvas></div></div></div></div></div></div>`;
 
-        block.innerHTML = freqHtml + statsHtml + chartsHtml; carousel.appendChild(block);
-        setTimeout(() => renderChartsForDataset(ds, index), 0);
+            block.innerHTML = freqHtml + statsHtml + chartsHtml; carousel.appendChild(block);
+            setTimeout(() => renderChartsForDataset(ds, index), 0);
+        }
     });
 
     document.getElementById('resultsArea').classList.remove('hidden');
     document.getElementById('exportBtn').classList.remove('hidden');
     document.getElementById('exportPdfBtn').classList.remove('hidden');
-    document.getElementById('floatingProcedureBtn').classList.remove('hidden');
+    
+    if(AppState.analysisMode === 'bivariate') {
+        document.getElementById('floatingProcedureBtn').classList.add('hidden');
+    } else {
+        document.getElementById('floatingProcedureBtn').classList.remove('hidden');
+    }
+    
     carousel.scrollLeft = 0; updateCarouselControls();
 }
 
@@ -186,6 +249,25 @@ function selectRange(start, end, clearFirst) {
 function clearSelection() { document.querySelectorAll('.cell-selected').forEach(td => td.classList.remove('cell-selected')); }
 export function updateRangeCount() { document.getElementById('rangeCount').innerText = `Rangos guardados: ${AppState.uploadedFilesMap.get(AppState.currentPreviewFileId).customRanges.length}/10`; }
 
+export function openBivariateModal(fileId, columns) {
+    AppState.currentPreviewFileId = fileId;
+    AppState.currentExcelColumns = columns;
+    
+    const selX = document.getElementById('bivariateXSelect');
+    const selY = document.getElementById('bivariateYSelect');
+    selX.innerHTML = ''; selY.innerHTML = '';
+    
+    columns.forEach((col, idx) => {
+        let opt1 = document.createElement('option'); opt1.value = idx; opt1.text = col.header;
+        let opt2 = document.createElement('option'); opt2.value = idx; opt2.text = col.header;
+        selX.add(opt1); selY.add(opt2);
+    });
+    
+    if(columns.length > 1) selY.selectedIndex = 1;
+
+    document.getElementById('bivariateModal').classList.remove('hidden');
+}
+
 export function initUIListeners() {
     document.getElementById('prevBtn').addEventListener('click', () => { if (AppState.currentSlide > 0) { AppState.currentSlide--; document.getElementById('resultsCarousel').scrollTo({ left: document.getElementById('resultsCarousel').clientWidth * AppState.currentSlide, behavior: 'smooth' }); updateCarouselControls(); }});
     document.getElementById('nextBtn').addEventListener('click', () => { if (AppState.currentSlide < AppState.globalDatasets.length - 1) { AppState.currentSlide++; document.getElementById('resultsCarousel').scrollTo({ left: document.getElementById('resultsCarousel').clientWidth * AppState.currentSlide, behavior: 'smooth' }); updateCarouselControls(); }});
@@ -194,6 +276,24 @@ export function initUIListeners() {
     document.getElementById('closeModalBtn').addEventListener('click', () => document.getElementById('previewModal').classList.add('hidden'));
     document.getElementById('closeChartModalBtn').addEventListener('click', () => document.getElementById('chartModal').classList.add('hidden'));
     document.getElementById('clearSelectionBtn').addEventListener('click', clearSelection);
+    
+    document.getElementById('closeBivariateModalBtn').addEventListener('click', () => document.getElementById('bivariateModal').classList.add('hidden'));
+    
+    document.getElementById('saveBivariateBtn').addEventListener('click', () => {
+        const fileObj = AppState.uploadedFilesMap.get(AppState.currentPreviewFileId);
+        const idxX = document.getElementById('bivariateXSelect').value;
+        const idxY = document.getElementById('bivariateYSelect').value;
+        
+        if(idxX === idxY) return alert("Por favor, selecciona dos variables DIFERENTES para poder cruzarlas.");
+        
+        const colX = AppState.currentExcelColumns[idxX];
+        const colY = AppState.currentExcelColumns[idxY];
+        
+        fileObj.customRanges.push({ type: 'bivariate_pair', colX, colY });
+        
+        alert(`Cruce guardado exitosamente.\nX: ${colX.header}\nY: ${colY.header}\n\nPresiona 'Procesar Datos' cuando estés listo.`);
+        document.getElementById('bivariateModal').classList.add('hidden');
+    });
     
     document.getElementById('resetRangesBtn').addEventListener('click', () => {
         if(!confirm("¿Borrar todos los rangos guardados para este archivo?")) return;
@@ -213,6 +313,8 @@ export function initUIListeners() {
 
     document.getElementById('floatingProcedureBtn').addEventListener('click', () => {
         const ds = AppState.globalDatasets[AppState.currentSlide]; 
+        if(!ds || ds.type === 'bivariate') return;
+        
         document.getElementById('procedureModalTitle').innerText = `Procedimiento Completo: ${ds.name}`;
         
         let isSturges = AppState.activeMethod === 'sturges';
