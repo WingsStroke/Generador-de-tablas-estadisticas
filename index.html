@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Suite Estadística 2.1</title>
+    <title>Suite Estadística 2.2</title>
     
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
@@ -14,7 +14,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
     
-    <link rel="stylesheet" href="styles.css?v=2.1.0">
+    <link rel="stylesheet" href="styles.css?v=2.2.0">
 </head>
 <body>
     <div class="container">
@@ -109,17 +109,18 @@
                 <h2 id="bivariateModalTitle">Cruce Bivariado Interactivo</h2>
                 <span class="close-btn" id="closeBivariateModalBtn">&times;</span>
             </div>
-            <p><strong>Comandos:</strong> Selecciona las celdas y asígnalas a su respectiva variable. <b>Importante:</b> Ambos rangos deben tener exactamente la misma cantidad de datos seleccionados.</p>
+            <p style="margin-bottom: 5px;">Selecciona todos los datos y luego asigna un nombre (variable). <b>Importante:</b> Ambos rangos deben tener la misma cantidad de datos seleccionados.</p>
+            <p style="font-size: 13px; color: #555; margin-top: 0; margin-bottom: 15px;"><i>Tip: Mantén presionada la tecla <b>X</b> o <b>Y</b> y haz clic en una celda para asignarla rápidamente como nombre de la variable.</i></p>
             
             <div class="range-controls" style="display: flex; gap: 15px; flex-wrap: wrap; align-items: center; justify-content: space-between;">
                 <div style="border: 2px solid #0000a0; padding: 10px; background: #f0f0ff; flex: 1; min-width: 250px;">
-                    <input type="text" id="bivariateNameX" placeholder="Nombre de la Variable X (Filas)" style="margin-bottom: 5px; width: 100%; padding: 5px;"><br>
+                    <input type="text" id="bivariateNameX" placeholder="Nombre de la Variable X (Filas)" style="margin-bottom: 5px; width: 100%; padding: 5px; box-sizing: border-box;"><br>
                     <button id="setRangeXBtn" style="background-color: #0000a0; color: #fff; width: 100%;">Asignar al Rango X</button>
                     <div id="countX" style="font-size: 13px; font-weight: bold; margin-top: 5px;">Datos seleccionados: 0</div>
                 </div>
                 
                 <div style="border: 2px solid #00a000; padding: 10px; background: #f0fff0; flex: 1; min-width: 250px;">
-                    <input type="text" id="bivariateNameY" placeholder="Nombre de la Variable Y (Columnas)" style="margin-bottom: 5px; width: 100%; padding: 5px;"><br>
+                    <input type="text" id="bivariateNameY" placeholder="Nombre de la Variable Y (Columnas)" style="margin-bottom: 5px; width: 100%; padding: 5px; box-sizing: border-box;"><br>
                     <button id="setRangeYBtn" style="background-color: #00a000; color: #fff; width: 100%;">Asignar al Rango Y</button>
                     <div id="countY" style="font-size: 13px; font-weight: bold; margin-top: 5px;">Datos seleccionados: 0</div>
                 </div>
@@ -162,6 +163,6 @@
         Ver Procedimiento
     </button>
 
-    <script type="module" src="js/main.js?v=2.1.0"></script>
+    <script type="module" src="js/main.js?v=2.2.0"></script>
 </body>
 </html>

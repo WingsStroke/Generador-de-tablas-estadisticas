@@ -8,6 +8,19 @@ if (typeof Chart !== 'undefined' && typeof ChartBoxPlot !== 'undefined') {
 let activeModalChart = null; 
 const miniChartOptions = { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { display: true }, y: { display: true } } };
 
+let isXPressed = false;
+let isYPressed = false;
+
+window.addEventListener('keydown', (e) => {
+    if (e.key.toLowerCase() === 'x') isXPressed = true;
+    if (e.key.toLowerCase() === 'y') isYPressed = true;
+});
+
+window.addEventListener('keyup', (e) => {
+    if (e.key.toLowerCase() === 'x') isXPressed = false;
+    if (e.key.toLowerCase() === 'y') isYPressed = false;
+});
+
 function getChartConfig(ds, type) {
     const labels = ds.classesData.map(c => cleanNum(c.xi));
     if (type === 'hist') return { data: { labels, datasets: [ { type: 'bar', label: 'Frecuencia fi', data: ds.classesData.map(c => c.fi), backgroundColor: 'rgba(0, 0, 0, 0.1)', borderColor: '#000', borderWidth: 1, barPercentage: 1, categoryPercentage: 1 }, { type: 'line', label: 'Polígono', data: ds.classesData.map(c => c.fi), borderColor: '#000', borderWidth: 2, tension: 0.1, fill: false, pointBackgroundColor: '#000' } ] } };
@@ -184,9 +197,6 @@ export function renderCarousel() {
     carousel.scrollLeft = 0; updateCarouselControls();
 }
 
-// ----------------------------------------------------
-// SISTEMA DE INTERFAZ: UNIVARIADO
-// ----------------------------------------------------
 let preview2DArray = []; let isDragging = false; let startCell = null; let lastClickedCell = null; let autoScrollInterval = null;
 
 export function openExcelModal(fileId) {
@@ -252,10 +262,6 @@ function selectRange(start, end, clearFirst) {
 function clearSelection() { document.querySelectorAll('#interactiveTable .cell-selected').forEach(td => td.classList.remove('cell-selected')); }
 export function updateRangeCount() { document.getElementById('rangeCount').innerText = `Rangos guardados: ${AppState.uploadedFilesMap.get(AppState.currentPreviewFileId).customRanges.length}/10`; }
 
-
-// ----------------------------------------------------
-// SISTEMA DE INTERFAZ: BIVARIADO (NUEVO)
-// ----------------------------------------------------
 let bivariate2DArray = []; let isBivDragging = false; let startBivCell = null; let lastBivClickedCell = null; let bivAutoScrollInterval = null;
 
 export function openBivariateModal(fileId) {
@@ -292,6 +298,16 @@ function renderBivariateTable() {
     const table = document.getElementById('interactiveBivariateTable');
     table.addEventListener('mousedown', (e) => {
         if(e.target.tagName !== 'TD' || e.target.classList.contains('cell-saved-x') || e.target.classList.contains('cell-saved-y')) return; 
+        
+        if (isXPressed) {
+            document.getElementById('bivariateNameX').value = e.target.innerText.trim();
+            return;
+        }
+        if (isYPressed) {
+            document.getElementById('bivariateNameY').value = e.target.innerText.trim();
+            return;
+        }
+
         isBivDragging = true; const r = parseInt(e.target.dataset.r), c = parseInt(e.target.dataset.c);
         if (e.ctrlKey || e.metaKey) { e.target.classList.toggle('cell-selected'); lastBivClickedCell = {r, c}; startBivCell = null; } 
         else if (e.shiftKey && lastBivClickedCell) { selectBivRange(lastBivClickedCell, {r, c}, true); } 
@@ -337,7 +353,6 @@ export function initUIListeners() {
     document.getElementById('closeChartModalBtn').addEventListener('click', () => document.getElementById('chartModal').classList.add('hidden'));
     document.getElementById('clearSelectionBtn').addEventListener('click', clearSelection);
     
-    // Listeners Univariados
     document.getElementById('resetRangesBtn').addEventListener('click', () => {
         if(!confirm("¿Borrar todos los rangos guardados para este archivo?")) return;
         AppState.uploadedFilesMap.get(AppState.currentPreviewFileId).customRanges = []; document.querySelectorAll('#interactiveTable .cell-saved').forEach(td => td.classList.remove('cell-saved')); updateRangeCount();
@@ -353,7 +368,6 @@ export function initUIListeners() {
     });
     document.getElementById('finishRangesBtn').addEventListener('click', () => document.getElementById('previewModal').classList.add('hidden'));
 
-    // Listeners Bivariados
     document.getElementById('closeBivariateModalBtn').addEventListener('click', () => document.getElementById('bivariateModal').classList.add('hidden'));
     document.getElementById('clearBivariateSelectionBtn').addEventListener('click', clearBivariateSelection);
     
@@ -412,18 +426,16 @@ export function initUIListeners() {
         
         updateBivariateRangeCount();
         
-        // Limpiamos memoria temporal para el siguiente cruce en el mismo archivo
         AppState.tempBivariateX = []; AppState.tempBivariateY = [];
         document.getElementById('countX').innerText = 'Datos seleccionados: 0';
         document.getElementById('countY').innerText = 'Datos seleccionados: 0';
         document.getElementById('bivariateNameX').value = '';
         document.getElementById('bivariateNameY').value = '';
         
-        alert(`Cruce guardado exitosamente.\n\nPuedes generar otro cruce con este archivo o presionar 'Cerrar' y luego procesar los datos.`);
+        alert(`Cruce guardado exitosamente.\n\nPresiona 'Procesar Datos' para ver los resultados.`);
+        document.getElementById('bivariateModal').classList.add('hidden');
     });
 
-
-    // Tutor Matemático Univariado
     document.getElementById('floatingProcedureBtn').addEventListener('click', () => {
         const ds = AppState.globalDatasets[AppState.currentSlide]; 
         if(!ds || ds.type === 'bivariate') return;
