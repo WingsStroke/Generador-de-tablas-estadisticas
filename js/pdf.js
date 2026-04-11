@@ -10,8 +10,9 @@ function getChartConfig(ds, type) {
 async function captureChartBase64(dataset, chartType) {
     return new Promise((resolve) => {
         const container = document.createElement('div');
-        container.style.width = '1000px';
-        container.style.height = '500px';
+        // Aumentamos dimensiones base para mayor muestreo
+        container.style.width = '1200px'; 
+        container.style.height = '600px';
         container.style.position = 'absolute';
         container.style.left = '-9999px'; 
         document.body.appendChild(container);
@@ -22,6 +23,8 @@ async function captureChartBase64(dataset, chartType) {
         const config = getChartConfig(dataset, chartType);
         config.options = {
             responsive: false,
+            maintainAspectRatio: false,
+            devicePixelRatio: 3, // Triplicamos la densidad de píxeles para máxima nitidez
             animation: false, 
             plugins: { legend: { display: false } }
         };
@@ -37,7 +40,7 @@ async function captureChartBase64(dataset, chartType) {
             chart.destroy();
             document.body.removeChild(container);
             resolve(base64);
-        }, 150);
+        }, 200); // Aumentamos margen para renderizado de alta resolución
     });
 }
 
@@ -131,17 +134,17 @@ export async function exportToPDF(dataset) {
         doc.setFontSize(10);
         doc.setFont('helvetica', 'normal');
         doc.text('Histograma y Polígono de Frecuencias', 105, currentY, { align: 'center' });
-        doc.addImage(imgHist, 'PNG', 15, currentY + 5, 180, 90);
+        doc.addImage(imgHist, 'PNG', 15, currentY + 5, 180, 90, undefined, 'FAST');
         currentY += 110;
 
         if (currentY > 180) { doc.addPage(); currentY = 20; }
         doc.text('Ojiva (Menor que)', 105, currentY, { align: 'center' });
-        doc.addImage(imgOjiva, 'PNG', 15, currentY + 5, 180, 90);
+        doc.addImage(imgOjiva, 'PNG', 15, currentY + 5, 180, 90, undefined, 'FAST');
         currentY += 110;
 
         if (currentY > 180) { doc.addPage(); currentY = 20; }
         doc.text('Diagrama de Caja y Bigotes', 105, currentY, { align: 'center' });
-        doc.addImage(imgBox, 'PNG', 15, currentY + 5, 180, 90);
+        doc.addImage(imgBox, 'PNG', 15, currentY + 5, 180, 90, undefined, 'FAST');
 
         doc.save(`Reporte_Estadistico_${dataset.name.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.pdf`);
 
