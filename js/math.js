@@ -11,32 +11,53 @@ export const getPercentile = (data, p) => {
     return l + 1 >= n ? data[l] : data[l] * (1 - (idx % 1)) + data[l + 1] * (idx % 1);
 };
 
-export function calculateStatsForDataset(raw, datasetName, activeMethod, manualKValue) {
+export function calculateStatsForDataset(raw, datasetName, activeMethod, manualKValue, tableType) {
     let data = [...raw].sort((a, b) => a - b);
     const n = data.length;
     const minVal = data[0];
     const maxVal = data[n - 1];
     const range = maxVal - minVal;
     
-    let numClasses = activeMethod === 'manual' ? parseInt(manualKValue) : Math.round(1 + 3.322 * Math.log10(n));
-    if (numClasses < 1) numClasses = 1;
+    const uniqueVals = [...new Set(data)].sort((a, b) => a - b);
     
-    const amplitude = range / numClasses;
-    let classesData = [];
-    let currentMin = minVal;
+    // La decisión recae enteramente en el selector manual del usuario
+    const isGrouped = tableType === 'grouped'; 
+    
+    let numClasses = 0, amplitude = 0, classesData = [];
     let cumulativeFreq = 0;
 
-    for (let i = 0; i < numClasses; i++) {
-        let currentMax = currentMin + amplitude;
-        let isLast = (i === numClasses - 1);
-        if (isLast) currentMax = maxVal; 
+    if (!isGrouped) {
+        numClasses = uniqueVals.length;
+        uniqueVals.forEach((val, idx) => {
+            let count = data.filter(x => x === val).length;
+            cumulativeFreq += count;
+            classesData.push({
+                isLast: idx === uniqueVals.length - 1,
+                xi: val,
+                fi: count,
+                Fi: cumulativeFreq,
+                hi: count / n,
+                Hi: cumulativeFreq / n
+            });
+        });
+    } else {
+        numClasses = activeMethod === 'manual' ? parseInt(manualKValue) : Math.round(1 + 3.322 * Math.log10(n));
+        if (numClasses < 1) numClasses = 1;
+        amplitude = range / numClasses;
+        let currentMin = minVal;
 
-        let count = data.filter(x => x >= currentMin && (isLast ? x <= currentMax : x < currentMax)).length;
-        let xi = (currentMin + currentMax) / 2;
-        cumulativeFreq += count;
-        
-        classesData.push({ min: currentMin, max: currentMax, isLast, xi, fi: count, Fi: cumulativeFreq, hi: count/n, Hi: cumulativeFreq/n });
-        currentMin = currentMax;
+        for (let i = 0; i < numClasses; i++) {
+            let currentMax = currentMin + amplitude;
+            let isLast = (i === numClasses - 1);
+            if (isLast) currentMax = maxVal; 
+
+            let count = data.filter(x => x >= currentMin && (isLast ? x <= currentMax : x < currentMax)).length;
+            let xi = (currentMin + currentMax) / 2;
+            cumulativeFreq += count;
+            
+            classesData.push({ min: currentMin, max: currentMax, isLast, xi, fi: count, Fi: cumulativeFreq, hi: count/n, Hi: cumulativeFreq/n });
+            currentMin = currentMax;
+        }
     }
 
     const sum = data.reduce((a, b) => a + b, 0);
@@ -58,7 +79,7 @@ export function calculateStatsForDataset(raw, datasetName, activeMethod, manualK
     if (n > 2 && stdDev > 0) skewness = (n / ((n - 1) * (n - 2))) * data.reduce((acc, val) => acc + Math.pow((val - mean) / stdDev, 3), 0);
 
     return { 
-        name: datasetName, data, n, minVal, maxVal, range, numClasses, amplitude, classesData, 
+        name: datasetName, data, n, minVal, maxVal, range, numClasses, amplitude, classesData, isGrouped, uniqueValsCount: uniqueVals.length,
         stats: { sum, mean, geoMean, harMean, median, mode, varianceSum, variance, stdDev, cv, skewness, p10: getPercentile(data,10), q1: getPercentile(data,25), q2: getPercentile(data,50), q3: getPercentile(data,75), p90: getPercentile(data,90) }
     };
 }

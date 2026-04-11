@@ -57,7 +57,6 @@ export function renderCarousel() {
         let kFormula = AppState.activeMethod === 'sturges' ? 'k ≈ 1 + 3.322 · log₁₀(n)' : 'Manual';
         let methodLabel = AppState.activeMethod === 'sturges' ? ' - Sturges' : ' - Manual';
 
-        // Renderizado Condicional de la Tabla
         let freqHtml = `<h3>Análisis ${index + 1}: ${ds.name} <span style="font-size:13px; font-weight:normal; color:#666;">(${ds.isGrouped ? 'Datos Agrupados' : 'Frecuencias Simples'})</span></h3><table><thead><tr>`;
         if (ds.isGrouped) {
             freqHtml += `<th>Límite Inf. (Li)</th><th>Límite Sup. (Ls)</th><th>Marca de Clase (Xi)</th>`;
@@ -121,7 +120,6 @@ export function renderCarousel() {
     carousel.scrollLeft = 0; updateCarouselControls();
 }
 
-// --- MODAL DE EXCEL ---
 let preview2DArray = []; let isDragging = false; let startCell = null; let lastClickedCell = null; let autoScrollInterval = null;
 
 export function openExcelModal(fileId) {
@@ -187,7 +185,6 @@ function selectRange(start, end, clearFirst) {
 function clearSelection() { document.querySelectorAll('.cell-selected').forEach(td => td.classList.remove('cell-selected')); }
 export function updateRangeCount() { document.getElementById('rangeCount').innerText = `Rangos guardados: ${AppState.uploadedFilesMap.get(AppState.currentPreviewFileId).customRanges.length}/10`; }
 
-// --- EVENTOS DE UI A INICIALIZAR ---
 export function initUIListeners() {
     document.getElementById('prevBtn').addEventListener('click', () => { if (AppState.currentSlide > 0) { AppState.currentSlide--; document.getElementById('resultsCarousel').scrollTo({ left: document.getElementById('resultsCarousel').clientWidth * AppState.currentSlide, behavior: 'smooth' }); updateCarouselControls(); }});
     document.getElementById('nextBtn').addEventListener('click', () => { if (AppState.currentSlide < AppState.globalDatasets.length - 1) { AppState.currentSlide++; document.getElementById('resultsCarousel').scrollTo({ left: document.getElementById('resultsCarousel').clientWidth * AppState.currentSlide, behavior: 'smooth' }); updateCarouselControls(); }});
@@ -213,7 +210,6 @@ export function initUIListeners() {
 
     document.getElementById('finishRangesBtn').addEventListener('click', () => document.getElementById('previewModal').classList.add('hidden'));
 
-    // Procedimiento Tutor adaptado
     document.getElementById('floatingProcedureBtn').addEventListener('click', () => {
         const ds = AppState.globalDatasets[AppState.currentSlide]; 
         document.getElementById('procedureModalTitle').innerText = `Procedimiento Completo: ${ds.name}`;
@@ -235,7 +231,7 @@ export function initUIListeners() {
                         <div class="math-formula">Límite Superior Ls = Li + A = ${cleanNum(firstRow.min)} + ${cleanNum(ds.amplitude)} = <span class="math-highlight">${cleanNum(firstRow.max)}</span></div>
                         <div class="math-formula">Marca de Clase Xi = (Li + Ls) / 2 = <span class="math-highlight">${cleanNum(firstRow.xi)}</span></div>`;
         } else {
-            html += `<p style="margin-top:10px;"><i>El sistema detectó solo ${ds.uniqueValsCount} valores únicos. Se ha omitido el cálculo de intervalos para generar una tabla simple.</i></p></div>
+            html += `<p style="margin-top:10px;"><i>Has seleccionado generar una tabla de Frecuencias Simples (datos no agrupados). Se ha omitido el cálculo de intervalos.</i></p></div>
                      <div class="procedure-step">
                         <h3>2. Construcción de la Tabla (Ejemplo 1ra Fila)</h3>
                         <div class="math-formula">Dato Xi = El valor único detectado = <span class="math-highlight">${cleanNum(firstRow.xi)}</span></div>`;

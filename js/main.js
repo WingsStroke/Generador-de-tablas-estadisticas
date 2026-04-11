@@ -3,10 +3,8 @@ import { calculateStatsForDataset } from './math.js';
 import { extractNumbersFromFile, exportAllToExcel } from './excel.js';
 import { renderCarousel, openExcelModal, initUIListeners } from './ui.js';
 
-// Inicializar todos los Listeners de la Interfaz
 initUIListeners();
 
-// Eventos de configuración y subida
 document.querySelectorAll('input[name="kMethod"]').forEach(r => r.addEventListener('change', (e) => {
     const inputManual = document.getElementById('kManualValue');
     inputManual.disabled = e.target.value !== 'manual';
@@ -20,6 +18,16 @@ document.querySelectorAll('input[name="uploadMode"]').forEach(r => r.addEventLis
         if (AppState.uploadedFilesMap.size > 0) fileQueue.classList.remove('hidden');
     } else if (e.target.value === 'paste') {
         fileInput.classList.add('hidden'); fileQueue.classList.add('hidden'); pasteArea.classList.remove('hidden');
+    }
+}));
+
+// Lógica para ocultar/mostrar panel de Intervalos
+document.querySelectorAll('input[name="tableType"]').forEach(r => r.addEventListener('change', (e) => {
+    const intervalSettings = document.getElementById('intervalSettings');
+    if (e.target.value === 'grouped') {
+        intervalSettings.classList.remove('hidden');
+    } else {
+        intervalSettings.classList.add('hidden');
     }
 }));
 
@@ -41,11 +49,12 @@ document.getElementById('fileInput').addEventListener('change', (e) => {
     document.getElementById('fileQueue').classList.remove('hidden');
 });
 
-// Eventos Principales de Procesamiento
 document.getElementById('processBtn').addEventListener('click', async () => {
     AppState.activeMethod = document.querySelector('input[name="kMethod"]:checked').value;
     const manualKValue = document.getElementById('kManualValue').value;
-    if (AppState.activeMethod === 'manual') {
+    const tableType = document.querySelector('input[name="tableType"]:checked').value;
+
+    if (AppState.activeMethod === 'manual' && tableType === 'grouped') {
         const manualK = parseInt(manualKValue);
         if (isNaN(manualK) || manualK < 1) return alert("Ingresa un número de intervalos válido.");
     }
@@ -62,17 +71,17 @@ document.getElementById('processBtn').addEventListener('click', async () => {
         const rawNums = rawStrings.map(s => parseFloat(s)).filter(n => !isNaN(n));
         if (rawNums.length === 0) return alert("No se encontraron números válidos.");
         
-        AppState.globalDatasets.push(calculateStatsForDataset(rawNums, "Datos Pegados", AppState.activeMethod, manualKValue));
+        AppState.globalDatasets.push(calculateStatsForDataset(rawNums, "Datos Pegados", AppState.activeMethod, manualKValue, tableType));
         renderCarousel(); return;
     }
     
     if (AppState.uploadedFilesMap.size === 0) return alert("Sube al menos un archivo.");
     for (let [fileId, fileData] of AppState.uploadedFilesMap) {
         if (fileData.customRanges.length > 0) {
-            fileData.customRanges.forEach((rangeNums, idx) => AppState.globalDatasets.push(calculateStatsForDataset(rangeNums, `${fileData.file.name} (Rango ${idx+1})`, AppState.activeMethod, manualKValue)));
+            fileData.customRanges.forEach((rangeNums, idx) => AppState.globalDatasets.push(calculateStatsForDataset(rangeNums, `${fileData.file.name} (Rango ${idx+1})`, AppState.activeMethod, manualKValue, tableType)));
         } else {
             const raw = await extractNumbersFromFile(fileData.file);
-            if (raw.length > 0) AppState.globalDatasets.push(calculateStatsForDataset(raw, fileData.file.name, AppState.activeMethod, manualKValue));
+            if (raw.length > 0) AppState.globalDatasets.push(calculateStatsForDataset(raw, fileData.file.name, AppState.activeMethod, manualKValue, tableType));
         }
     }
 

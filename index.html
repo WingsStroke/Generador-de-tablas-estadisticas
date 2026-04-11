@@ -11,7 +11,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@sgratzl/chartjs-chart-boxplot@4.4.2/build/index.umd.min.js"></script>
     
-    <link rel="stylesheet" href="styles.css?v=1.11.0">
+    <link rel="stylesheet" href="styles.css?v=1.12.0">
 </head>
 <body>
     <div class="container">
@@ -46,6 +46,22 @@
             </div>
             
             <div class="settings-panel">
+                <h3>Tipo de Datos / Tabla</h3>
+                <label>
+                    <input type="radio" name="tableType" value="simple" checked> 
+                    <span class="tooltip">Frecuencias Simples (No Agrupados)
+                        <span class="tooltiptext">Ideal por defecto o para datos con pocos valores únicos.</span>
+                    </span>
+                </label>
+                <label>
+                    <input type="radio" name="tableType" value="grouped"> 
+                    <span class="tooltip">Frecuencias por Intervalos (Agrupados)
+                        <span class="tooltiptext">Utiliza límites inferiores y superiores.</span>
+                    </span>
+                </label>
+            </div>
+
+            <div class="settings-panel hidden" id="intervalSettings">
                 <h3>Configuración de Intervalos</h3>
                 <label>
                     <input type="radio" name="kMethod" value="sturges" checked> 
@@ -111,15 +127,14 @@
                 <h2 id="procedureModalTitle">Procedimiento Matemático</h2>
                 <span class="close-btn" id="closeProcedureModalBtn">&times;</span>
             </div>
-            <div id="procedureContent" class="procedure-body">
-                </div>
+            <div id="procedureContent" class="procedure-body"></div>
         </div>
     </div>
 
     <button id="floatingProcedureBtn" class="floating-btn hidden">
-        <span style="font-size: 1.2em; vertical-align: middle;"></span> Ver Procedimiento
+        <span style="font-size: 1.2em; vertical-align: middle;">📋</span> Ver Procedimiento
     </button>
 
-    <script type="module" src="js/main.js?v=1.11.0"></script>
+    <script type="module" src="js/main.js?v=1.12.0"></script>
 </body>
 </html>
