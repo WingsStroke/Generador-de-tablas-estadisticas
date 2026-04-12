@@ -1,19 +1,28 @@
+/* ========================================= */
+/* SUITE ESTADÍSTICA v3.5.0 - AERO GLASS UI  */
+/* ========================================= */
+
 :root {
     --bg-base: #f4f7f9;
     --text-main: #111827;
     --text-muted: #4b5563;
     
+    /* Liquid Crystal / Aero Moderno (Gran transparencia) */
     --glass-bg-main: rgba(255, 255, 255, 0.25); 
     --glass-bg-solid: rgba(255, 255, 255, 0.55); 
     
+    /* Bordes brillantes Aero */
     --glass-border-light: rgba(255, 255, 255, 0.8);
     --glass-border-dark: rgba(255, 255, 255, 0.2);
     
+    /* SOMBRAS DE ALTO CONTRASTE */
     --glass-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.35), 0 10px 20px -5px rgba(0, 0, 0, 0.2);
     --glass-shadow-hover: 0 35px 60px -15px rgba(0, 0, 0, 0.45), 0 15px 30px -5px rgba(0, 0, 0, 0.25);
     
+    /* Reflejos Aero internos */
     --glass-reflection: inset 0 1px 1px rgba(255, 255, 255, 0.9), inset 0 -1px 2px rgba(255, 255, 255, 0.1);
     
+    /* Acentos Funcionales */
     --accent-dark: #111827;
     --accent-blue: rgba(0, 85, 255, 0.8);
     --accent-green: rgba(0, 160, 45, 0.8);
@@ -123,11 +132,13 @@ h2, h3 { font-weight: 600; margin-top: 0; letter-spacing: -0.5px; }
     padding: 35px;
     margin-bottom: 30px;
     transition: var(--transition-smooth);
+    box-sizing: border-box;
 }
 
 #resultsCarousel {
-    display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scroll-behavior: smooth; gap: 40px; 
-    padding: 35px 20px 20px 20px; 
+    display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scroll-behavior: smooth; 
+    /* Padding horizontal eliminado para no afectar el 100% flex width de los bloques */
+    padding: 35px 0 20px 0; 
     background: rgba(255,255,255,0.3) !important;
 }
 
@@ -277,8 +288,8 @@ tr:last-child td { border-bottom: none; }
 #carouselIndicator { font-weight: 700; letter-spacing: 1px; color: var(--text-main); }
 
 .dataset-block { 
-    flex: 0 0 100%; scroll-snap-align: center; 
-    padding: 0 15px; 
+    flex: 0 0 100%; width: 100%; scroll-snap-align: center; 
+    padding: 0 35px; /* Padding interno trasladado aquí para evitar desbordes */
     box-sizing: border-box;
 }
 .dataset-block > h3 {
@@ -303,7 +314,7 @@ tr:last-child td { border-bottom: none; }
 .stat-card h3 { font-size: 13px; color: var(--text-muted); border-bottom: 1px solid rgba(0,0,0,0.06); padding-bottom: 10px; margin-bottom: 15px; text-transform: uppercase;}
 .stat-row { display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 14px; align-items: center; font-weight: 500;}
 
-/* --- GRÁFICOS (AERO BOXES) --- */
+/* --- GRÁFICOS (AERO BOXES UNIVERSALES) --- */
 .chart-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
 .chart-item {
     background: rgba(255, 255, 255, 0.5); backdrop-filter: blur(16px);
@@ -315,7 +326,7 @@ tr:last-child td { border-bottom: none; }
 .chart-item h4 { text-align: center; text-transform: uppercase; font-size: 12px; color: var(--text-muted); border-bottom: 1px solid rgba(0,0,0,0.05); padding-bottom: 10px; margin-top: 0;}
 .chart-canvas-wrapper { position: relative; flex-grow: 1; width: 100%; }
 
-/* --- ACORDEÓN --- */
+/* --- ACORDEÓN AERO UNIVERSAL --- */
 .chart-accordion { margin-top: 35px; width: 100%; }
 .accordion-item { 
     border: 1px solid var(--glass-border-light); border-radius: var(--radius-md); background: rgba(255,255,255,0.3); 
@@ -328,7 +339,7 @@ tr:last-child td { border-bottom: none; }
 .accordion-content { max-height: 0; overflow: hidden; transition: max-height 0.4s ease, padding 0.4s ease; padding: 0 24px; }
 .accordion-item.active .accordion-content { max-height: 1000px; padding: 24px; border-top: 1px solid rgba(0,0,0,0.05); }
 
-/* --- MODALES --- */
+/* --- MODALES AERO UNIVERSALES Y ANIMADOS --- */
 .modal { 
     position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
     background-color: rgba(17, 24, 39, 0.5); 
@@ -397,7 +408,7 @@ tr:last-child td { border-bottom: none; }
 
 
 /* ========================================= */
-/* --- RESPONSIVIDAD MÓVIL (v3.4.0) --- */
+/* --- RESPONSIVIDAD MÓVIL Y FLUIDA --- */
 /* ========================================= */
 
 @media (max-width: 768px) {
@@ -413,12 +424,11 @@ tr:last-child td { border-bottom: none; }
     #resultsCarousel { 
         padding: 20px 15px; 
         margin-bottom: 20px; 
-        gap: 20px; 
     }
     
     .settings-panel { padding: 12px 15px; }
     
-    /* Botones principales responsivos */
+    /* Botones principales responsivos en columna */
     .btn-group { 
         display: flex; 
         flex-direction: column; 
@@ -442,9 +452,10 @@ tr:last-child td { border-bottom: none; }
         margin-left: 0; 
     }
     
-    /* Tablas con scroll horizontal en móviles (Responsividad Líquida) */
+    /* Tablas con scroll horizontal inteligente en móviles */
     .dataset-block > table, 
-    .cross-table { 
+    .cross-table,
+    .procedure-body table { 
         display: block; 
         overflow-x: auto; 
         white-space: nowrap; 
@@ -452,9 +463,24 @@ tr:last-child td { border-bottom: none; }
     }
     th, td { padding: 10px 12px; font-size: 12px; }
     
-    /* Gráficos en Acordeón a 1 sola columna */
-    .chart-grid { grid-template-columns: 1fr; }
-    .chart-item { height: 220px; }
+    /* Padding interno ajustado para móviles en el carrusel */
+    .dataset-block {
+        padding: 0 15px;
+    }
+    
+    /* Gráficos en Acordeón: Columna central y reducidos */
+    .chart-grid { 
+        display: flex;
+        flex-direction: column;
+        align-items: center; /* Centra las gráficas */
+        gap: 20px;
+    }
+    .chart-item { 
+        height: 220px; 
+        width: 100%;
+        max-width: 280px; /* Evita cajas gigantes, tamaño compacto y estético */
+        margin: 0 auto;
+    }
     
     /* Modales adaptables */
     .modal-content { 
@@ -485,13 +511,13 @@ tr:last-child td { border-bottom: none; }
         width: auto;
     }
     
-    /* Modal Flotante de Gráficos (Corrección de Aspect Ratio) */
+    /* Modal Flotante de Gráficos (Corrección de Aspect Ratio para móvil) */
     .chart-modal-size { 
         height: auto; 
         max-height: 80vh; 
     }
     .chart-modal-body { 
-        height: 50vh; /* Altura relativa más proporcionada */
+        height: 50vh; /* Altura relativa para no deformar en vertical */
         min-height: 300px; 
         display: flex; 
         align-items: center; 
@@ -499,11 +525,11 @@ tr:last-child td { border-bottom: none; }
         width: 100%;
     }
     
-    /* Procedimiento Matemático */
+    /* Procedimiento Matemático ajustado */
     .procedure-body { padding: 10px; }
     .math-formula { padding: 12px; font-size: 13px; }
     
-    /* Botón Flotante */
+    /* Botón Flotante ajustado para toque */
     .floating-btn { 
         bottom: 20px; 
         right: 20px; 
