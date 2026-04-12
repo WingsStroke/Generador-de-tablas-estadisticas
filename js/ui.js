@@ -235,30 +235,32 @@ function renderPreviewTable() {
         selectRange(startCell, {r: parseInt(e.target.dataset.r), c: parseInt(e.target.dataset.c)}, true);
     });
 
-    // Eventos Touch (Móvil - Long Press Selección)
+    // Eventos Touch (Móvil - Long Press 1s Selección Segmentada)
     table.addEventListener('touchstart', (e) => {
         if(e.target.tagName !== 'TD' || e.target.classList.contains('cell-saved')) return;
         const r = parseInt(e.target.dataset.r), c = parseInt(e.target.dataset.c);
 
-        if (isMobileSelectionMode && mobileRangeStartCell) {
-            e.preventDefault(); // Evita doble selección accidental
-            selectRange(mobileRangeStartCell, {r, c}, true);
-            isMobileSelectionMode = false;
-            mobileRangeStartCell = null;
-            document.querySelectorAll('.mobile-range-start').forEach(el => el.classList.remove('mobile-range-start'));
-            return;
-        }
-
         mobileLongPressTimer = setTimeout(() => {
-            isMobileSelectionMode = true;
-            mobileRangeStartCell = {r, c};
-            e.target.classList.add('mobile-range-start');
-            if(navigator.vibrate) navigator.vibrate(50); // Feedback táctil leve
-        }, 2000);
-    }, {passive: false});
+            if (isMobileSelectionMode && mobileRangeStartCell) {
+                // Selecciona el intervalo al mantener presionada la celda final
+                selectRange(mobileRangeStartCell, {r, c}, true);
+                isMobileSelectionMode = false;
+                mobileRangeStartCell = null;
+                document.querySelectorAll('.mobile-range-start').forEach(el => el.classList.remove('mobile-range-start'));
+                if(navigator.vibrate) navigator.vibrate(50);
+            } else {
+                // Activa el modo selección al mantener presionada la celda inicial
+                isMobileSelectionMode = true;
+                mobileRangeStartCell = {r, c};
+                e.target.classList.add('mobile-range-start');
+                if(navigator.vibrate) navigator.vibrate(50);
+            }
+        }, 1000); // 1 segundo
+    }, {passive: true});
 
     table.addEventListener('touchend', () => clearTimeout(mobileLongPressTimer));
-    table.addEventListener('touchmove', () => clearTimeout(mobileLongPressTimer));
+    // Si el usuario hace scroll (touchmove), el temporizador se cancela permitiendo el movimiento libre
+    table.addEventListener('touchmove', () => clearTimeout(mobileLongPressTimer), {passive: true});
     table.addEventListener('touchcancel', () => clearTimeout(mobileLongPressTimer));
 
     // Scroll inteligente (Escritorio)
@@ -363,30 +365,29 @@ function renderBivariateTable() {
         selectBivRange(startBivCell, {r: parseInt(e.target.dataset.r), c: parseInt(e.target.dataset.c)}, true);
     });
 
-    // Eventos Touch (Móvil - Long Press Selección)
+    // Eventos Touch (Móvil - Long Press 1s Selección Segmentada)
     table.addEventListener('touchstart', (e) => {
         if(e.target.tagName !== 'TD' || e.target.classList.contains('cell-saved-x') || e.target.classList.contains('cell-saved-y')) return;
         const r = parseInt(e.target.dataset.r), c = parseInt(e.target.dataset.c);
 
-        if (bivIsMobileSelectionMode && bivMobileRangeStartCell) {
-            e.preventDefault();
-            selectBivRange(bivMobileRangeStartCell, {r, c}, true);
-            bivIsMobileSelectionMode = false;
-            bivMobileRangeStartCell = null;
-            document.querySelectorAll('.mobile-range-start').forEach(el => el.classList.remove('mobile-range-start'));
-            return;
-        }
-
         bivMobileLongPressTimer = setTimeout(() => {
-            bivIsMobileSelectionMode = true;
-            bivMobileRangeStartCell = {r, c};
-            e.target.classList.add('mobile-range-start');
-            if(navigator.vibrate) navigator.vibrate(50);
-        }, 2000);
-    }, {passive: false});
+            if (bivIsMobileSelectionMode && bivMobileRangeStartCell) {
+                selectBivRange(bivMobileRangeStartCell, {r, c}, true);
+                bivIsMobileSelectionMode = false;
+                bivMobileRangeStartCell = null;
+                document.querySelectorAll('.mobile-range-start').forEach(el => el.classList.remove('mobile-range-start'));
+                if(navigator.vibrate) navigator.vibrate(50);
+            } else {
+                bivIsMobileSelectionMode = true;
+                bivMobileRangeStartCell = {r, c};
+                e.target.classList.add('mobile-range-start');
+                if(navigator.vibrate) navigator.vibrate(50);
+            }
+        }, 1000);
+    }, {passive: true});
 
     table.addEventListener('touchend', () => clearTimeout(bivMobileLongPressTimer));
-    table.addEventListener('touchmove', () => clearTimeout(bivMobileLongPressTimer));
+    table.addEventListener('touchmove', () => clearTimeout(bivMobileLongPressTimer), {passive: true});
     table.addEventListener('touchcancel', () => clearTimeout(bivMobileLongPressTimer));
 
     container.addEventListener('mousemove', (e) => {
