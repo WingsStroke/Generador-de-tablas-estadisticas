@@ -1,5 +1,5 @@
 /* ========================================= */
-/* SUITE ESTADÍSTICA v3.5.0 - AERO GLASS UI  */
+/* SUITE ESTADÍSTICA v3.6.0 - AERO GLASS UI  */
 /* ========================================= */
 
 :root {
@@ -7,22 +7,17 @@
     --text-main: #111827;
     --text-muted: #4b5563;
     
-    /* Liquid Crystal / Aero Moderno (Gran transparencia) */
     --glass-bg-main: rgba(255, 255, 255, 0.25); 
     --glass-bg-solid: rgba(255, 255, 255, 0.55); 
     
-    /* Bordes brillantes Aero */
     --glass-border-light: rgba(255, 255, 255, 0.8);
     --glass-border-dark: rgba(255, 255, 255, 0.2);
     
-    /* SOMBRAS DE ALTO CONTRASTE */
     --glass-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.35), 0 10px 20px -5px rgba(0, 0, 0, 0.2);
     --glass-shadow-hover: 0 35px 60px -15px rgba(0, 0, 0, 0.45), 0 15px 30px -5px rgba(0, 0, 0, 0.25);
     
-    /* Reflejos Aero internos */
     --glass-reflection: inset 0 1px 1px rgba(255, 255, 255, 0.9), inset 0 -1px 2px rgba(255, 255, 255, 0.1);
     
-    /* Acentos Funcionales */
     --accent-dark: #111827;
     --accent-blue: rgba(0, 85, 255, 0.8);
     --accent-green: rgba(0, 160, 45, 0.8);
@@ -137,9 +132,9 @@ h2, h3 { font-weight: 600; margin-top: 0; letter-spacing: -0.5px; }
 
 #resultsCarousel {
     display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scroll-behavior: smooth; 
-    /* Padding horizontal eliminado para no afectar el 100% flex width de los bloques */
     padding: 35px 0 20px 0; 
     background: rgba(255,255,255,0.3) !important;
+    overscroll-behavior: contain; /* Previene scroll del fondo al llegar al final del carrusel */
 }
 
 .controls.glass-panel:hover,
@@ -212,7 +207,7 @@ textarea { width: 100%; min-height: 120px; resize: vertical; line-height: 1.5; m
 
 /* --- LISTA DE ARCHIVOS --- */
 .file-queue { margin-bottom: 20px; }
-.file-queue ul { list-style: none; padding: 0; margin: 0; max-height: 200px; overflow-y: auto; }
+.file-queue ul { list-style: none; padding: 0; margin: 0; max-height: 200px; overflow-y: auto; overscroll-behavior: contain; }
 .file-queue li { 
     display: flex; justify-content: space-between; align-items: center; 
     padding: 12px 18px; border-bottom: 1px solid rgba(0,0,0,0.03); 
@@ -289,7 +284,7 @@ tr:last-child td { border-bottom: none; }
 
 .dataset-block { 
     flex: 0 0 100%; width: 100%; scroll-snap-align: center; 
-    padding: 0 35px; /* Padding interno trasladado aquí para evitar desbordes */
+    padding: 0 35px; 
     box-sizing: border-box;
 }
 .dataset-block > h3 {
@@ -346,6 +341,7 @@ tr:last-child td { border-bottom: none; }
     backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); 
     z-index: 1000; display: flex; justify-content: center; align-items: center; 
     transition: opacity 0.4s ease;
+    overscroll-behavior: contain; /* Previene scroll encadenado */
 }
 .modal.hidden { display: none !important; }
 .modal:not(.hidden) .modal-content { animation: modalAppear 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
@@ -358,6 +354,7 @@ tr:last-child td { border-bottom: none; }
     border-top: 1px solid var(--glass-border-light); border-left: 1px solid var(--glass-border-light); border-right: 1px solid var(--glass-border-dark); border-bottom: 1px solid var(--glass-border-dark); 
     border-radius: var(--radius-lg); padding: 30px; display: flex; flex-direction: column; 
     box-shadow: 0 30px 60px rgba(0,0,0,0.15), inset 0 1px 1px rgba(255,255,255,0.9);
+    overscroll-behavior: contain;
 }
 .modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(0,0,0,0.06); margin-bottom: 20px; padding-bottom: 15px;}
 .close-btn { font-size: 28px; color: var(--text-muted); cursor: pointer; transition: color 0.2s; line-height: 1;}
@@ -375,6 +372,7 @@ tr:last-child td { border-bottom: none; }
 .table-glass-container { 
     flex-grow: 1; overflow: auto; background: rgba(255,255,255,0.6); border-radius: var(--radius-md); 
     border: 1px solid rgba(0,0,0,0.08); position: relative; user-select: none; box-shadow: inset 0 2px 10px rgba(0,0,0,0.03);
+    overscroll-behavior: contain; /* Bloquea el rebote del fondo al hacer scroll en la tabla */
 }
 .table-glass-container table { width: max-content; margin: 0; box-shadow: none; border-radius: 0; background: transparent;}
 .table-glass-container td, .table-glass-container th { padding: 10px 14px; min-width: 60px; cursor: cell; border-right: 1px solid rgba(0,0,0,0.04);}
@@ -386,7 +384,7 @@ tr:last-child td { border-bottom: none; }
 
 .range-badge { font-weight: 600; color: var(--text-muted); font-size: 14px; background: rgba(255,255,255,0.6); padding: 8px 14px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.8);}
 
-.procedure-body { flex-grow: 1; overflow-y: auto; padding: 10px 25px; font-size: 15px; line-height: 1.7; }
+.procedure-body { flex-grow: 1; overflow-y: auto; padding: 10px 25px; font-size: 15px; line-height: 1.7; overscroll-behavior: contain;}
 .procedure-step { margin-bottom: 35px; padding-bottom: 25px; border-bottom: 1px solid rgba(0,0,0,0.06); }
 .procedure-step h3 { color: var(--accent-dark); border-bottom: 2px solid var(--accent-dark); display: inline-block; padding-bottom: 6px; font-size: 16px;}
 .math-formula { background: rgba(255,255,255,0.7); border-left: 4px solid var(--accent-dark); border-radius: 0 var(--radius-sm) var(--radius-sm) 0; padding: 16px 20px; margin: 12px 0; font-family: 'Courier New', Courier, monospace; font-size: 14.5px; overflow-x: auto; box-shadow: 0 4px 10px rgba(0,0,0,0.03); }
@@ -408,7 +406,7 @@ tr:last-child td { border-bottom: none; }
 
 
 /* ========================================= */
-/* --- RESPONSIVIDAD MÓVIL Y FLUIDA --- */
+/* --- RESPONSIVIDAD MÓVIL Y FLUIDA (v3.6.0) --- */
 /* ========================================= */
 
 @media (max-width: 768px) {
@@ -440,7 +438,7 @@ tr:last-child td { border-bottom: none; }
         margin-bottom: 0; 
     }
     
-    /* Ajuste para "Definir Manualmente" (Solución de Overflow) */
+    /* Ajuste para "Definir Manualmente" */
     .manual-input-label { 
         flex-wrap: wrap; 
         align-items: flex-start;
@@ -463,7 +461,6 @@ tr:last-child td { border-bottom: none; }
     }
     th, td { padding: 10px 12px; font-size: 12px; }
     
-    /* Padding interno ajustado para móviles en el carrusel */
     .dataset-block {
         padding: 0 15px;
     }
@@ -472,43 +469,73 @@ tr:last-child td { border-bottom: none; }
     .chart-grid { 
         display: flex;
         flex-direction: column;
-        align-items: center; /* Centra las gráficas */
+        align-items: center;
         gap: 20px;
     }
     .chart-item { 
         height: 220px; 
         width: 100%;
-        max-width: 280px; /* Evita cajas gigantes, tamaño compacto y estético */
+        max-width: 280px; /* Tamaño compacto para móviles */
         margin: 0 auto;
     }
     
-    /* Modales adaptables */
+    /* Modales adaptables y SCROLLABLES */
     .modal-content { 
-        padding: 20px; 
-        height: 95vh; 
-        width: 100%; 
+        padding: 15px; 
+        height: 92vh; 
+        width: 95%; 
         border-radius: var(--radius-md); 
+        /* En móviles, convertimos el modal a bloque para que haga scroll interno nativo */
+        display: flex;
+        flex-direction: column;
+        overflow-y: auto; 
+        justify-content: flex-start;
     }
+    
+    .modal-header { margin-bottom: 10px; padding-bottom: 10px; }
+    .modal-header h2 { font-size: 1.2rem; }
+    .close-btn { font-size: 24px; }
+    
+    /* Fuentes reducidas para ahorrar espacio vertical */
+    .modal-instructions { font-size: 13px; line-height: 1.4; margin-bottom: 8px; }
+    .modal-tip { font-size: 12px; margin-bottom: 15px; }
     
     /* Ajuste de cuadrículas en modal bivariado */
     .bivariate-grid { 
         flex-direction: column; 
-        gap: 15px; 
+        gap: 10px; 
+        margin-bottom: 10px;
     }
+    .bivariate-box { padding: 12px; min-width: 100%;}
+    
     .range-controls { 
         display: flex; 
         flex-direction: column; 
         align-items: stretch; 
-        gap: 10px; 
+        gap: 8px; 
+        padding: 12px;
     }
     .range-controls button { 
         margin: 0; 
         width: 100%; 
+        padding: 10px;
+        font-size: 13.5px;
     }
     .range-badge { 
         text-align: center; 
         margin-left: 0 !important; 
         width: auto;
+        font-size: 12px;
+        padding: 6px 10px;
+    }
+    
+    /* FIX CRÍTICO: Contenedor de la tabla en móviles no se aplasta */
+    .table-glass-container {
+        flex: 0 0 auto; /* Evita que flexbox aplaste la tabla */
+        height: 400px; /* Altura garantizada para poder ver los datos */
+        min-height: 400px;
+        margin-top: 15px;
+        width: 100%;
     }
     
     /* Modal Flotante de Gráficos (Corrección de Aspect Ratio para móvil) */
@@ -517,7 +544,7 @@ tr:last-child td { border-bottom: none; }
         max-height: 80vh; 
     }
     .chart-modal-body { 
-        height: 50vh; /* Altura relativa para no deformar en vertical */
+        height: 50vh; 
         min-height: 300px; 
         display: flex; 
         align-items: center; 
